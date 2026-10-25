@@ -16,10 +16,11 @@ def prepare_handoff(installer, item, *, explicitly_confirmed=False, **preflight_
         "installer": str(path),
         "install_dir": str(install_dir),
         "arguments": [
-            "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
-            "/NOCLOSEAPPLICATIONS", "/SP-",
+            "/NORESTART", "/NOCLOSEAPPLICATIONS",
             "/DIR=" + str(install_dir),
         ],
         "restart_executable": str(install_dir / "ParaNoya.exe"),
         "execute": False,
+        "requires_app_exit": True,
+        "requires_installer_ui": True,
     }
