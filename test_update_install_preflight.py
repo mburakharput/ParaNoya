@@ -22,9 +22,9 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         self.payload = b"test setup payload"
         self.installer = self.base / "ParaNoya-1.2.5.4-Windows-x64-Setup.exe"
         self.installer.write_bytes(self.payload)
-        self.item = dict(name=self.installer.name, size=len(self.payload),
+        self.item = dict(name=self.installer.name, version="1.2.5.4", size=len(self.payload),
                          sha256=hashlib.sha256(self.payload).hexdigest())
-        self.patcher = patch("update_install_preflight.load_config", return_value={"updates_enabled": True})
+        self.patcher = patch("update_install_preflight.load_config", return_value={"updates_enabled": True, "version": "1.2.5.3"})
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
 
@@ -60,8 +60,20 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         with self.assertRaises(UpdateError):
             self.check()
 
+    def test_rejects_downgrade(self):
+        with self.assertRaises(UpdateError):
+            check_install_preflight(self.installer, {**self.item, "version": "1.2.5.2"},
+                executable=self.exe, local_app_data=self.base / "LocalAppData",
+                finance_data_dir=self.base / "AileFinans", frozen=True)
+
+    def test_rejects_same_version(self):
+        with self.assertRaises(UpdateError):
+            check_install_preflight(self.installer, {**self.item, "version": "1.2.5.3"},
+                executable=self.exe, local_app_data=self.base / "LocalAppData",
+                finance_data_dir=self.base / "AileFinans", frozen=True)
+
     def test_disabled_feature_cannot_install(self):
-        with patch("update_install_preflight.load_config", return_value={"updates_enabled": False}):
+        with patch("update_install_preflight.load_config", return_value={"updates_enabled": False, "version": "1.2.5.3"}):
             with self.assertRaises(UpdateError):
                 self.check()
 
