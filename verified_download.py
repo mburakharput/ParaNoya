@@ -50,7 +50,7 @@ def download_verified(config, item):
     expected_name = f"ParaNoya-{version}-Windows-x64-Setup.exe"
     expected_url = (f"https://github.com/{config.get('repository')}/releases/download/"
                     f"ParaNoya-v{version}/{expected_name}")
-    if (not re.fullmatch(r"[0-9]+(?:\\.[0-9]+){2,3}", version)
+    if (not re.fullmatch(r"[0-9]+(?:\.[0-9]+){2,3}", version)
             or item.get("name") != expected_name or item.get("url") != expected_url):
         raise UpdateError("Sürüm veya indirme adresi eşleşmiyor")
     if (type(item.get("size")) is not int or not 0 < item["size"] <= 2 * 1024**3
