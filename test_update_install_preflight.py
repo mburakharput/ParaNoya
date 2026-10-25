@@ -39,7 +39,7 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         data.mkdir()
         db = data / "ailefinans.db"
         db.write_bytes(b"do not touch")
-        self.assertEqual(self.check(), self.install)
+        self.assertEqual(self.check().resolve(), self.install.resolve())
         self.assertEqual(db.read_bytes(), b"do not touch")
 
     def test_rejects_data_inside_installed_app(self):
