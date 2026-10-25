@@ -20,7 +20,9 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         self.exe = self.install / "ParaNoya.exe"
         self.exe.write_bytes(b"fake installed app")
         self.payload = b"test setup payload"
-        self.installer = self.base / "ParaNoya-1.2.5.4-Windows-x64-Setup.exe"
+        self.stage = tempfile.TemporaryDirectory(prefix="paranoya-verified-")
+        self.addCleanup(self.stage.cleanup)
+        self.installer = Path(self.stage.name) / "ParaNoya-1.2.5.4-Windows-x64-Setup.exe"
         self.installer.write_bytes(self.payload)
         self.item = dict(name=self.installer.name, version="1.2.5.4", size=len(self.payload),
                          sha256=hashlib.sha256(self.payload).hexdigest())
@@ -68,6 +70,14 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
                    side_effect=UpdateError("İmza geçersiz")):
             with self.assertRaises(UpdateError):
                 self.check()
+
+    def test_rejects_installer_outside_verified_directory(self):
+        other = self.base / self.installer.name
+        other.write_bytes(self.payload)
+        with self.assertRaises(UpdateError):
+            check_install_preflight(other, self.item,
+                executable=self.exe, local_app_data=self.base / "LocalAppData",
+                finance_data_dir=self.base / "AileFinans", frozen=True)
 
     def test_rejects_downgrade(self):
         with self.assertRaises(UpdateError):
