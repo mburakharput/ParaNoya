@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish v1.2.5.2 after installer checks
+        description: Publish v1.2.5.3 after installer checks
         type: boolean
         default: false
 permissions:
@@ -44,8 +44,11 @@ jobs:
         run: |
           $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
           if (!(Test-Path $iscc)) { throw "Inno Setup 6 missing from Windows runner" }
-          & $iscc /DAppVersion=1.2.5.2 installer\ParaNoya.iss
+          & $iscc /DAppVersion=1.2.5.3 installer\ParaNoya.iss
           if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+      - name: Verify executable icon resources
+        shell: pwsh
+        run: python verify_windows_icons.py dist\ParaNoya\ParaNoya.exe (Get-Item installer-output\*-Setup.exe).FullName
       - name: Verify install, startup, upgrade and uninstall
         shell: pwsh
         run: |
@@ -91,7 +94,7 @@ jobs:
           COMMIT: ${{ github.sha }}
           REF: ${{ github.ref }}
         run: |
-          tag="v1.2.5.2"
+          tag="v1.2.5.3"
           if [[ "$REF" == refs/tags/* ]]; then tag="${REF#refs/tags/}"; fi
-          test "$tag" = v1.2.5.2 || { echo "Installer version must match tag"; exit 1; }
+          test "$tag" = v1.2.5.3 || { echo "Installer version must match tag"; exit 1; }
           gh release create "$tag" release-assets/* --target "$COMMIT" --title "ParaNoya $tag" --notes "Windows x64 kurulum paketi. Windows runner üzerinde testler, kurulum, açılış, yeniden kurulum ve kaldırma kontrolleri başarıyla tamamlandı. Kişisel finans verileri pakete dahil değildir. Kurulum dosyası kod imzalı değildir."
