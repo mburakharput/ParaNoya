@@ -27,6 +27,9 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         self.patcher = patch("update_install_preflight.load_config", return_value={"updates_enabled": True, "version": "1.2.5.3"})
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
+        self.auth_patcher = patch("update_install_preflight.authenticate_candidate", return_value=True)
+        self.auth_patcher.start()
+        self.addCleanup(self.auth_patcher.stop)
 
     def check(self, **changes):
         args=dict(executable=self.exe, local_app_data=self.base / "LocalAppData",
@@ -59,6 +62,12 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         (self.install / "unins000.exe").unlink()
         with self.assertRaises(UpdateError):
             self.check()
+
+    def test_rejects_invalid_publisher_signature(self):
+        with patch("update_install_preflight.authenticate_candidate",
+                   side_effect=UpdateError("İmza geçersiz")):
+            with self.assertRaises(UpdateError):
+                self.check()
 
     def test_rejects_downgrade(self):
         with self.assertRaises(UpdateError):
