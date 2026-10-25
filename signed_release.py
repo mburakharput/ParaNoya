@@ -1,6 +1,7 @@
 """Verify signed central release records; never execute a downloaded installer."""
 import json
 import re
+from nacl.exceptions import BadSignatureError
 
 class SignatureError(ValueError):
     pass
@@ -27,7 +28,6 @@ def verify_manifest(public_key_hex, raw_manifest, signature_hex, *, version, nam
         if type(raw_manifest) is not bytes or len(raw_manifest) > 16 * 1024:
             raise SignatureError("İmzalı kayıt boyutu geçersiz")
         from nacl.signing import VerifyKey
-        from nacl.exceptions import BadSignatureError
         VerifyKey(public_key).verify(raw_manifest, signature)
         record = json.loads(raw_manifest.decode("ascii"), object_pairs_hook=_no_duplicate_keys)
     except (ValueError, TypeError, UnicodeError, BadSignatureError, ImportError) as exc:
