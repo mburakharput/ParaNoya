@@ -81,8 +81,8 @@ class UpdateCheckController(QObject):
         elif result:
             reply = QMessageBox.question(
                 self.parent_window, "İmzalı güncelleme bulundu",
-                f"ParaNoya {result['version']} doğrulandı.\\n"
-                "Kurulum paketini güvenli biçimde indirmek ister misiniz?\\n"
+                f"ParaNoya {result['version']} doğrulandı.\n"
+                "Kurulum paketini güvenli biçimde indirmek ister misiniz?\n"
                 "İndirme uygulamayı kapatmaz ve kurulumu başlatmaz.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
@@ -129,7 +129,7 @@ class UpdateCheckController(QObject):
         else:
             QMessageBox.information(
                 self.parent_window, "Güvenli indirme tamamlandı",
-                "İmzalı kurulum paketi doğrulandı ve indirildi.\\n"
-                "Otomatik kurulum henüz etkin değil.\\n"
+                "İmzalı kurulum paketi doğrulandı ve indirildi.\n"
+                "Otomatik kurulum henüz etkin değil.\n"
                 f"Dosya: {path}",
             )
