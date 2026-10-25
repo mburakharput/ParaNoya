@@ -375,6 +375,12 @@ class App(QMainWindow):
         theme_btn = QPushButton('☼ / ☾  Temayı değiştir')
         theme_btn.clicked.connect(self.toggle_theme)
         left.addWidget(theme_btn)
+        self.update_button = QPushButton('↻  Güncellemeleri denetle')
+        self.update_button.setToolTip('Yeni sürüm denetimi; otomatik yükleme yapmaz')
+        from central_update_ui import UpdateCheckController
+        self.update_controller = UpdateCheckController(self, self.update_button)
+        self.update_button.clicked.connect(self.update_controller.start)
+        left.addWidget(self.update_button)
         outer.addWidget(sidebar)
         content = QVBoxLayout()
         self.heading = QLabel()
