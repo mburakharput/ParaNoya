@@ -40,8 +40,8 @@ def check_install_preflight(installer, item, *, executable=None, local_app_data=
         raise UpdateError("Finansal veriler uygulama klasörünün içinde; yükseltme durduruldu")
     original = Path(installer).absolute()
     path = original.resolve()
-    if original.is_symlink() or original != path:
-        raise UpdateError("Kurulum yolu bağlantı veya yönlendirme içeriyor")
+    if any(part.is_symlink() for part in (original, *original.parents)):
+        raise UpdateError("Kurulum yolu sembolik bağlantı içeriyor")
     if not path.is_file():
         raise UpdateError("Kurulum dosyası bulunamadı")
     # Only accept files placed in the isolated verified download directory.
