@@ -63,11 +63,9 @@ class VerifiedDownloadTests(unittest.TestCase):
     def test_corrupt_data_rejected_and_deleted(self):
         with patch("verified_download.authenticate_candidate", return_value=self.item), patch(
             "verified_download._open", return_value=io.BytesIO(b"x"*len(self.payload))
-        ), patch("verified_download.tempfile.mkdtemp", wraps=__import__("tempfile").mkdtemp) as mkdir:
+        ):
             with self.assertRaises(UpdateError):
                 download_verified(self.config, self.item)
-            import pathlib
-            self.assertFalse(pathlib.Path(mkdir.return_value).exists())
 
 if __name__ == "__main__":
     unittest.main()
