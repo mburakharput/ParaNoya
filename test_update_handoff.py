@@ -27,6 +27,10 @@ class HandoffPlanTests(unittest.TestCase):
         self.assertIs(result["execute"], False)
         self.assertEqual(result["restart_executable"], str(self.install_dir / "ParaNoya.exe"))
         self.assertIn("/NOCLOSEAPPLICATIONS", result["arguments"])
+        self.assertTrue(result["requires_app_exit"])
+        self.assertTrue(result["requires_installer_ui"])
+        self.assertNotIn("/SILENT", result["arguments"])
+        self.assertNotIn("/SUPPRESSMSGBOXES", result["arguments"])
         self.assertIn("/DIR=" + str(self.install_dir), result["arguments"])
 
     def test_preflight_failure_prevents_plan(self):
