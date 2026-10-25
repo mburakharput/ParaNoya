@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 
-from central_updates import UpdateError, load_config, version_tuple
+from central_updates import UpdateError, load_config, version_tuple, authenticate_candidate
 
 def check_install_preflight(installer, item, *, executable=None, local_app_data=None,
                             finance_data_dir=None, frozen=None):
@@ -50,6 +50,9 @@ def check_install_preflight(installer, item, *, executable=None, local_app_data=
         raise UpdateError("Kurulum dosyası bilgileri geçersiz")
     if not isinstance(digest, str) or len(digest) != 64:
         raise UpdateError("Kurulum özeti geçersiz")
+    # Recheck the signed release metadata immediately before handoff.
+    # A matching local SHA-256 is not sufficient without publisher authentication.
+    authenticate_candidate(config, item)
     if path.stat().st_size != size:
         raise UpdateError("Kurulum dosyası boyutu değişmiş")
     sha = hashlib.sha256()
