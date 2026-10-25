@@ -1,3 +1,9 @@
+# ParaNoya v1.2.5.3
+
+Windows x64 kurulum dosyası: https://github.com/mburakharput/ParaNoya/releases/latest
+
+Bu sürüm: daha dar banka listesi ve 32px satırlar; logo ile banka adı arasında sabit boşluk; Enpara symbol/use ve Şekerbank clipPath çizim düzeltmesi; hesap, kart, KMH, ödeme ve transfer seçimlerinde ortak logo çizimi; tüm seçim kutularında ve tarih açılır alanlarında uyumlu ok. ParaNoya baykuşu uygulama ve Setup EXE ikonuna gömülüdür. Banka logolarının indirme davranışı korunur. Kişisel veri paketlenmez.
+
 # ParaNoya — Birleşik geliştirme sürümü v1.2.2
 
 **Slogan:** Paranın peşini bırakma!  

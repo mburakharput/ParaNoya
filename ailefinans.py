@@ -17,6 +17,7 @@ from recurring_core import migrate_recurring, add_item, upcoming_items, pay_occu
 from record_manager import migrate_record_state, get_state, change_state, dependencies
 from card_catalog import load_catalog, search_catalog
 from bank_logo_manager import logo_path, fetch_logos
+from bank_logo_renderer import bank_icon, menu_icon
 from document_center import TYPES, migrate_documents, stage, list_docs, approve_salary
 from kmh_core import migrate_kmh, closing_due, set_overdraft, overdraft, use_overdraft, add_installment_loan, monthly_calendar, pay_installment
 from v04_core import month_add, cards,create_card,purchase,pay_card,upcoming,shared_history,edit_shared_split
@@ -103,6 +104,7 @@ class InlineDialog(QDialog):
         host = self.parent()
         if host is None or not hasattr(host, 'stack'):
             return super().exec()
+        host._decorate_bank_widgets(self)
         stack = host.stack
         previous = stack.currentWidget()
         # Use a QWidget presentation, not a separate top-level/modal window.
@@ -154,7 +156,7 @@ def list_bank_names():
 
 class BankSelectionCombo(QComboBox):
     """Compact searchable bank selection with proportional, padded logo slots."""
-    ROW_HEIGHT = 42
+    ROW_HEIGHT = 32
     VISIBLE_ROWS = 5
 
     def __init__(self, parent=None):
@@ -162,16 +164,17 @@ class BankSelectionCombo(QComboBox):
         self.setObjectName('bankSelection')
         self.setEditable(True)
         self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.setMinimumHeight(42)
+        self.setMinimumHeight(36)
+        self.setMaximumWidth(420)
         # Narrow icon region prevents wide bank-wordmarks from dominating the list.
-        self.setIconSize(QSize(122, 32))
+        self.setIconSize(QSize(110, 24))
         self.setMaxVisibleItems(self.VISIBLE_ROWS)
         view = QListView(self)
         view.setUniformItemSizes(True)
         view.setSpacing(0)
-        view.setIconSize(QSize(122, 32))
+        view.setIconSize(QSize(110, 24))
         view.setStyleSheet("""QListView {padding: 3px 5px;outline:0;}
-            QListView::item { min-height: 42px; padding: 0px 8px; }
+            QListView::item { min-height: 32px; padding: 0px 6px; }
             QListView::item:selected {background:#d6f3f2;color:#0e344d;border-radius:5px;}""")
         self.setView(view)
         # A QCompleter supplies contains-search without expanding all banks on screen.
@@ -180,7 +183,7 @@ class BankSelectionCombo(QComboBox):
         completer.setFilterMode(Qt.MatchFlag.MatchContains)
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         completer.setMaxVisibleItems(self.VISIBLE_ROWS)
-        completer.popup().setIconSize(QSize(122, 32))
+        completer.popup().setIconSize(QSize(110, 24))
         completer.popup().setStyleSheet(view.styleSheet())
         self.setCompleter(completer)
         self.lineEdit().installEventFilter(self)
@@ -194,7 +197,7 @@ class BankSelectionCombo(QComboBox):
     def showPopup(self):
         # Apply after population: keeps the menu short, even with many banks.
         self.setMaxVisibleItems(self.VISIBLE_ROWS)
-        self.view().setIconSize(QSize(122, 32))
+        self.view().setIconSize(QSize(110, 24))
         self.view().setFixedHeight(self.ROW_HEIGHT * self.VISIBLE_ROWS + 8)
         self.view().setMinimumWidth(0)
         self.view().setMaximumWidth(max(250, self.width()))
@@ -239,35 +242,7 @@ class AddAccountDialog(InlineDialog):
 
     @staticmethod
     def _logo_icon(bank_name):
-        """Render bank SVGs at 3x resolution to keep long wordmarks crisp on HiDPI.
-
-        The readable bank name is always a separate native-text label.
-        """
-        path = logo_path(bank_name)
-        if not path:
-            return QIcon()
-        try:
-            from PySide6.QtSvg import QSvgRenderer
-            renderer = QSvgRenderer(str(path))
-            if not renderer.isValid():
-                return QIcon(str(path))
-            logical_w, logical_h, density = 122, 32, 3
-            canvas = QPixmap(logical_w * density, logical_h * density)
-            canvas.setDevicePixelRatio(density)
-            canvas.fill(Qt.GlobalColor.transparent)
-            painter = QPainter(canvas)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-            base = renderer.defaultSize()
-            if base.width() > 0 and base.height() > 0:
-                # Keep a margin while giving long SVG wordmarks more width.
-                scale = min(112.0 / base.width(), 27.0 / base.height())
-                w, h = base.width() * scale, base.height() * scale
-                renderer.render(painter, QRectF((logical_w - w)/2, (logical_h-h)/2, w, h))
-            painter.end()
-            return QIcon(canvas)
-        except Exception:
-            return QIcon(str(path))
+        return menu_icon(logo_path(bank_name))
 
     def _kind_changed(self, *_):
         self.bank.setEnabled(self.kind.currentData() == 'bank')
@@ -321,7 +296,7 @@ class App(QMainWindow):
         migrate_products(self.db)
         self._row_ids={'account':[], 'card':[], 'kmh':[]}
         self.dark = False
-        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.2')
+        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.3')
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')))
         self.resize(1440, 900)
         self.setMinimumSize(920, 600)
@@ -977,15 +952,23 @@ class App(QMainWindow):
         self.refresh()
 
     def fill_table(self, table, rows):
+        table.setIconSize(QSize(110, 24))
         table.setRowCount(len(rows))
         for r, row in enumerate(rows):
             for c, value in enumerate(row):
-                table.setItem(r, c, QTableWidgetItem(str(value)))
+                item = QTableWidgetItem(str(value))
+                heading = table.horizontalHeaderItem(c).text()
+                if heading in {'Hesap', 'Kart', 'Banka hesabı', 'Gönderen', 'Alıcı', 'Ödeyen hesap'}:
+                    bank = self._bank_for_text(str(value))
+                    if bank:
+                        item.setIcon(self._bank_icon(bank))
+                table.setItem(r, c, item)
 
     def refresh(self, *_):
         pid = self.pid()
         if pid is None:
             return
+        self._bank_aliases = self._build_bank_aliases()
         income, expense, balance = summary(self.db, pid)
         self.income_value.setText(money(income))
         self.expense_value.setText(money(expense))
@@ -1059,7 +1042,7 @@ class App(QMainWindow):
         _,name,kind,balance=record
         self.account_detail_heading.setText(name)
         from bank_logo_manager import LOGO_IDS
-        bank=next((b for b in sorted(LOGO_IDS,key=len,reverse=True) if b.lower() in name.lower()),'')
+        bank=self._bank_for_text(name)
         self._set_detail_logo(self.account_logo, bank)
         detail=f'Hesap türü: {"Banka hesabı" if kind=="bank" else "Nakit / cüzdan"}  •  Güncel bakiye: {money(balance)}'
         linked=next((x for x in overdraft(self.db,self.pid()) if x[1]==account_id),None)
@@ -1084,7 +1067,7 @@ class App(QMainWindow):
             WHERE l.overdraft_id=?""",(od_id,)).fetchone()
         self.kmh_detail_heading.setText(name)
         from bank_logo_manager import LOGO_IDS
-        bank=next((b for b in sorted(LOGO_IDS,key=len,reverse=True) if b.lower() in name.lower()),'')
+        bank=self._bank_for_text(name)
         self._set_detail_logo(self.kmh_logo, bank)
         self.kmh_detail_body.setText(f'Normal KMH limiti: {money(limit)}  •  Kullanılan: {money(used)}  •  Kullanılabilir: {money(limit-used)}\nTaksitli KMH satır sayısı: {loan_info[0]}  •  Kalan taksitli borç: {money(loan_info[1])}')
 
@@ -1372,13 +1355,52 @@ class App(QMainWindow):
         else:
             self.statusBar().showMessage('Banka logoları güncel.', 3500)
 
-    def _refresh_bank_icons(self):
-        # Qt seçim kutularının ikonları önceden eklendiği için yenile.
-        for widget in self.findChildren(QComboBox):
+    def _build_bank_aliases(self):
+        from bank_logo_manager import LOGO_IDS
+        aliases = {name: {name} for name in LOGO_IDS}
+        tables = {r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if 'account_bank_details' in tables:
+            for name, bank in self.db.execute(
+                    'SELECT a.name,b.bank_name FROM accounts a JOIN account_bank_details b ON b.account_id=a.id WHERE a.profile_id=?',
+                    (self.pid(),)):
+                aliases.setdefault(name, set()).add(bank)
+        if 'card_catalog_links' in tables:
+            for name, bank in self.db.execute(
+                    'SELECT c.name,l.bank FROM credit_cards c JOIN card_catalog_links l ON l.card_id=c.id WHERE c.profile_id=?',
+                    (self.pid(),)):
+                aliases.setdefault(name, set()).add(bank)
+        return aliases
+
+    def _bank_for_text(self, text):
+        # Prefer saved bank metadata, including custom account/card nicknames.
+        aliases = getattr(self, '_bank_aliases', {})
+        folded = text.casefold()
+        for label in sorted(aliases, key=len, reverse=True):
+            key = label.casefold()
+            if folded == key or any(folded.startswith(key + sep) for sep in (' (', ' · ', ' — ', ' - ')):
+                banks = aliases[label]
+                return next(iter(banks)) if len(banks) == 1 else ''
+        return ''
+
+    def _decorate_bank_widgets(self, root):
+        for widget in root.findChildren(QComboBox):
+            found = False
             for index in range(widget.count()):
-                name = widget.itemText(index)
-                if name in __import__('bank_logo_manager').LOGO_IDS:
-                    widget.setItemIcon(index, self._bank_icon(name))
+                data = widget.itemData(index)
+                bank = data[0] if isinstance(data, tuple) and len(data) == 2 and isinstance(data[0], str) else self._bank_for_text(widget.itemText(index))
+                if bank:
+                    widget.setItemIcon(index, self._bank_icon(bank))
+                    found = True
+            if found:
+                widget.setIconSize(QSize(110, 24))
+                widget.setMaxVisibleItems(5)
+                widget.setMaximumWidth(420)
+                widget.view().setIconSize(QSize(110, 24))
+                widget.view().setStyleSheet("QListView {padding:3px 5px;outline:0;} QListView::item {min-height:32px;padding:0px 6px;}")
+
+    def _refresh_bank_icons(self):
+        self._decorate_bank_widgets(self)
+        self.refresh()
         self.update_account_details()
         self.update_kmh_details()
         if hasattr(self, 'card_table'):
@@ -1389,7 +1411,7 @@ class App(QMainWindow):
 
     def _set_detail_logo(self, target, bank):
         icon = self._bank_icon(bank)
-        pixmap = icon.pixmap(QSize(110, 32))
+        pixmap = icon.pixmap(QSize(110, 24), self.devicePixelRatioF())
         target.setPixmap(pixmap)
         target.setVisible(bool(bank and logo_path(bank)))
 
@@ -1397,20 +1419,21 @@ class App(QMainWindow):
         # Optional official logo assets supplied by the user; do not impersonate logos.
         source = logo_path(bank)
         if source:
-            return QIcon(str(source))
+            return menu_icon(source)
         # Neutral initials badge, NOT a bank trademark/logo.
-        pix = QPixmap(28, 28)
+        pix = QPixmap(330, 72)
+        pix.setDevicePixelRatio(3)
         pix.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pix)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setBrush(QColor('#50647e'))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(1, 1, 26, 26, 6, 6)
+        painter.drawRoundedRect(4, 1, 22, 22, 5, 5)
         painter.setPen(QColor('#ffffff'))
         font = QFont('Arial', 9, QFont.Weight.Bold)
         painter.setFont(font)
         initials = ''.join(word[0] for word in bank.split()[:2]).upper()
-        painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, initials)
+        painter.drawText(QRectF(4, 1, 22, 22), Qt.AlignmentFlag.AlignCenter, initials)
         painter.end()
         return QIcon(pix)
 
@@ -1433,6 +1456,7 @@ class App(QMainWindow):
             loop.quit()
         save.clicked.connect(lambda:finish(True));cancel.clicked.connect(lambda:finish(False))
         bar=QHBoxLayout();bar.addWidget(save);bar.addWidget(cancel);f.addRow(bar)
+        self._decorate_bank_widgets(d)
         loop.exec()
         self.stack.removeWidget(d)
         d.deleteLater()
@@ -1505,7 +1529,7 @@ class App(QMainWindow):
         query=QLineEdit();query.setPlaceholderText('Kart veya banka ara…')
         bank=QComboBox();bank.addItem('Tüm bankalar','')
         for v in sorted({x['bank'] for x in catalog}):bank.addItem(self._bank_icon(v),v,v)
-        bank.setIconSize(QSize(24,24))
+        bank.setIconSize(QSize(110,24))
         model=QComboBox()
         network=QComboBox()
         for key in ('Bilinmiyor / henüz seçilmedi', 'Visa', 'Mastercard', 'TROY', 'Diğer'):
@@ -1530,10 +1554,11 @@ class App(QMainWindow):
             previous=model.currentData();model.clear()
             for c in search_catalog(catalog,query.text(),bank.currentData()):
                 status=' • doğrulandı' if c['verified'] else ' • kontrol edin'
-                model.addItem(c['bank']+' — '+c['card']+status,(c['bank'],c['card']))
+                model.addItem(self._bank_icon(c['bank']),c['bank']+' — '+c['card']+status,(c['bank'],c['card']))
             if previous:
                 idx=model.findData(previous)
                 if idx>=0:model.setCurrentIndex(idx)
+            self._decorate_bank_widgets(d)
         def update_manual():
             flag=manual.isChecked();custom_bank.setEnabled(flag);custom_card.setEnabled(flag)
             query.setEnabled(not flag);bank.setEnabled(not flag);model.setEnabled(not flag)
@@ -1633,8 +1658,8 @@ class App(QMainWindow):
             QPushButton[nav='true'] {{text-align:left;padding:9px 12px;background:transparent;border:0;border-radius:10px;min-height:21px;}}
             QPushButton[nav='true']:hover {{background:#066e85;}}
             QComboBox,QLineEdit,QDoubleSpinBox,QDateEdit {{background:{surface};border:1px solid {border};border-radius:9px;padding:9px;}}
-            QComboBox::drop-down {{subcontrol-origin:padding;subcontrol-position:top right;width:33px;border:0;border-left:1px solid {border};border-top-right-radius:9px;border-bottom-right-radius:9px;}}
-            QComboBox::down-arrow {{image:url({(Path(__file__).resolve().parent / 'assets' / 'chevron-down.svg').as_posix()});width:17px;height:17px;}}
+            QComboBox::drop-down, QDateEdit::drop-down {{subcontrol-origin:padding;subcontrol-position:top right;width:33px;border:0;border-left:1px solid {border};border-top-right-radius:9px;border-bottom-right-radius:9px;}}
+            QComboBox::down-arrow, QDateEdit::down-arrow {{image:url(\"{(Path(__file__).resolve().parent / 'assets' / 'chevron-down.svg').as_posix()}\");width:14px;height:14px;}}
             QComboBox QAbstractItemView {{selection-background-color:#0e9bab;selection-color:#ffffff;outline:0;}}
             QComboBox#bankSelection {{padding-left:11px;}}
             QTableWidget {{background:{card};alternate-background-color:{surface};border:1px solid {border};border-radius:10px;gridline-color:{border};selection-background-color:#087f94;}}
