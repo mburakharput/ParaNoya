@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from nacl.signing import SigningKey
-from packaging.sign_release import sign_installer
+from release_tools.sign_release import sign_installer
 from signed_release import verify_manifest
 
 class OfflineSigningTests(unittest.TestCase):
