@@ -103,6 +103,17 @@ class PostExitRunnerTests(unittest.TestCase):
                         restart_application=lambda executable: events.append("restart"))
         self.assertEqual(events, ["exit", "verify", "install", "restart"])
 
+    def test_silent_installer_flags_are_rejected(self):
+        for flag in ("/SILENT", "/VERYSILENT", "/SUPPRESSMSGBOXES"):
+            with self.subTest(flag=flag):
+                altered = {**self.plan, "arguments": self.plan["arguments"] + [flag]}
+                with self.assertRaises(UpdateError):
+                    execute_after_exit(altered, self.item, confirmed=True,
+                        wait_for_exit=lambda: True, run_installer=self.run,
+                        restart_application=self.restart)
+        self.run.assert_not_called()
+        self.restart.assert_not_called()
+
     def test_disabled_updates_block_execution(self):
         with patch("update_runner.load_config", return_value={"updates_enabled": False}):
             with self.assertRaises(UpdateError):
