@@ -48,6 +48,22 @@ class PostExitRunnerTests(unittest.TestCase):
             self.invoke(confirmed=False)
         self.run.assert_not_called()
 
+    def test_windows_pid_waiter_connected(self):
+        with patch("update_runner.wait_for_pid_exit", return_value=True) as wait:
+            self.assertTrue(self.invoke(wait_for_exit=None, app_pid=2345))
+            wait.assert_called_once_with(2345)
+
+    def test_windows_pid_timeout_blocks_install(self):
+        with patch("update_runner.wait_for_pid_exit", return_value=False):
+            with self.assertRaises(UpdateError):
+                self.invoke(wait_for_exit=None, app_pid=2345)
+        self.run.assert_not_called()
+
+    def test_invalid_pid_blocks_install(self):
+        with self.assertRaises(UpdateError):
+            self.invoke(wait_for_exit=None, app_pid=0)
+        self.run.assert_not_called()
+
     def test_app_still_open_never_starts(self):
         with self.assertRaises(UpdateError):
             self.invoke(wait_for_exit=lambda: False)
