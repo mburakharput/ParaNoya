@@ -9,9 +9,10 @@ import subprocess
 import sys
 
 from central_updates import UpdateError, load_config
+from update_handoff import prepare_handoff
 
 
-def execute_after_exit(plan, *, confirmed=False, wait_for_exit=None, run_installer=None,
+def execute_after_exit(plan, item, *, confirmed=False, wait_for_exit=None, run_installer=None,
                        restart_application=None):
     """Run a previously authenticated installer ONLY after the old app has exited.
 
@@ -39,6 +40,10 @@ def execute_after_exit(plan, *, confirmed=False, wait_for_exit=None, run_install
         raise UpdateError("Kurulum planı uygun değil")
     if not wait_for_exit():
         raise UpdateError("ParaNoya henüz kapanmadı; kurulum iptal edildi")
+    # Reject altered plans and authenticate the publisher + bytes once more at use time.
+    verified = prepare_handoff(installer, item, explicitly_confirmed=True)
+    if plan != verified:
+        raise UpdateError("Kurulum planı doğrulanmış bilgilerle eşleşmiyor")
     runner = run_installer or _run_installer
     result = runner([str(installer), *args])
     if result != 0:
