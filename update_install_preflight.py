@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 
-from central_updates import UpdateError, load_config
+from central_updates import UpdateError, load_config, version_tuple
 
 def check_install_preflight(installer, item, *, executable=None, local_app_data=None,
                             finance_data_dir=None, frozen=None):
@@ -39,6 +39,11 @@ def check_install_preflight(installer, item, *, executable=None, local_app_data=
         raise UpdateError("Finansal veriler uygulama klasörünün içinde; yükseltme durduruldu")
     path = Path(installer).resolve()
     name = item.get("name")
+    version = item.get("version", "")
+    if not isinstance(version, str) or version_tuple(version) <= version_tuple(config["version"]):
+        raise UpdateError("Güncelleme sürümü mevcut sürümden yeni olmalı")
+    if name != f"ParaNoya-{version}-Windows-x64-Setup.exe":
+        raise UpdateError("Kurulum adı sürümle eşleşmiyor")
     size = item.get("size")
     digest = item.get("sha256")
     if path.name != name or not isinstance(size, int) or isinstance(size, bool):
