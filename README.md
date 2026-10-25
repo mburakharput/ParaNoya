@@ -197,10 +197,10 @@ arka planda yapılır. Başarılı olduktan sonra ParaNoya'yı yeniden başlatı
 - Açılır liste 5×42 piksel satır yüksekliğiyle kompakt kalır ve arama korunur.
 - Çok uzun ve ayrıntılı banka logolarının küçük boyutta tüm iç yazılarının okunaklı olması garanti edilemez; banka adı her zaman tam görünür.
 
-## Windows kurulumu ve yayınlama (v1.2.5.2)
+## Windows kurulumu ve yayınlama (v1.2.5.3)
 
 GitHub Actions → Windows installer her main değişikliğinde Windows x64 kurulumunu üretir.
-Release için Actions içinden Run workflow seçilip publish işaretlenir veya v1.2.5.2 etiketi gönderilir.
+Yeni bir sürüm yayımlamak için önce installer/ParaNoya.iss dosyasındaki AppVersion değerini yükseltin. GitHub Actions → Windows installer içinde Run workflow → publish seçeneğiyle veya bu sürüme karşılık gelen vSÜRÜM etiketiyle yayın başlatın. İş akışı kurulum sürümünü bu dosyadan okur; etiket uyuşmazsa ya da aynı sürümün Release kaydı zaten varsa yayınlamayı durdurur.
 Yayın yalnızca Windows testleri, gerçek kurulum, uygulama açılışı, yeniden kurulum ve kaldırma başarılıysa yapılır.
 Kurulum dosyası kod imzalı değildir.
 
