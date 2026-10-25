@@ -80,6 +80,12 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         with self.assertRaises(UpdateError):
             self.check(executable=self.base / "ParaNoya.exe")
 
+    def test_rejects_nonhex_digest(self):
+        with self.assertRaises(UpdateError):
+            check_install_preflight(self.installer, {**self.item, "sha256": "z" * 64},
+                executable=self.exe, local_app_data=self.base / "LocalAppData",
+                finance_data_dir=self.base / "AileFinans", frozen=True)
+
     def test_rejects_hash_mismatch(self):
         self.installer.write_bytes(b"changed installer")
         with self.assertRaises(UpdateError):
