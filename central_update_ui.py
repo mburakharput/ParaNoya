@@ -101,7 +101,7 @@ class UpdateCheckController(QObject):
                                     "Şu anda doğrulanmış daha yeni bir sürüm bulunmuyor.")
 
     def _download(self, config, result):
-        if self.download_thread is not None or self.thread is not None and self.thread.isRunning():
+        if self.download_thread is not None:
             return
         self.button.setEnabled(False)
         self.button.setText("↻  Doğrulanmış paket indiriliyor…")
