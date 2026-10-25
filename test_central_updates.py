@@ -26,7 +26,9 @@ class CentralDiscoveryTests(unittest.TestCase):
         release = {"tag_name": "ParaNoya-v1.2.5.4", "assets": [
             {"name": "ParaNoya-1.2.5.4-Windows-x64-Setup.exe", "state": "uploaded",
              "browser_download_url": "https://github.com/mburakharput/uygulama-guncellemeleri/releases/download/ParaNoya-v1.2.5.4/ParaNoya-1.2.5.4-Windows-x64-Setup.exe",
-             "digest": "sha256:" + "a"*64}]}
+             "digest": "sha256:" + "a"*64, "size": 120},
+            {"name": "ParaNoya-1.2.5.4-manifest.json", "state": "uploaded", "browser_download_url": "https://github.com/mburakharput/uygulama-guncellemeleri/releases/download/ParaNoya-v1.2.5.4/ParaNoya-1.2.5.4-manifest.json"},
+            {"name": "ParaNoya-1.2.5.4-manifest.json.sig", "state": "uploaded", "browser_download_url": "https://github.com/mburakharput/uygulama-guncellemeleri/releases/download/ParaNoya-v1.2.5.4/ParaNoya-1.2.5.4-manifest.json.sig"}]}
         item = candidate(self.config, release)
         self.assertEqual(item["version"], "1.2.5.4")
         self.assertNotIn("install", item)
