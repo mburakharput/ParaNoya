@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish v1.2.5.3 after installer checks
+        description: Publish current installer version after checks
         type: boolean
         default: false
 permissions:
@@ -44,7 +44,12 @@ jobs:
         run: |
           $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
           if (!(Test-Path $iscc)) { throw "Inno Setup 6 missing from Windows runner" }
-          & $iscc /DAppVersion=1.2.5.3 installer\ParaNoya.iss
+          $source = Get-Content installer\ParaNoya.iss -Raw
+          $match = [regex]::Match($source, '#define AppVersion "([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)"')
+          if (!$match.Success) { throw "Installer AppVersion missing" }
+          $version = $match.Groups[1].Value
+          if ($env:GITHUB_REF -like 'refs/tags/v*' -and $env:GITHUB_REF -ne "refs/tags/v$version") { throw "Tag/version mismatch" }
+          & $iscc "/DAppVersion=$version" installer\ParaNoya.iss
           if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
       - name: Verify executable icon resources
         shell: pwsh
@@ -87,6 +92,7 @@ jobs:
         with:
           name: ParaNoya-Windows-x64
           path: release-assets
+      - uses: actions/checkout@v4
       - name: Publish verified installer
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,7 +100,11 @@ jobs:
           COMMIT: ${{ github.sha }}
           REF: ${{ github.ref }}
         run: |
-          tag="v1.2.5.3"
-          if [[ "$REF" == refs/tags/* ]]; then tag="${REF#refs/tags/}"; fi
-          test "$tag" = v1.2.5.3 || { echo "Installer version must match tag"; exit 1; }
+          version=$(sed -nE 's/^[[:space:]]*#define AppVersion "([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?)".*/\1/p' installer/ParaNoya.iss | head -n 1)
+          test -n "$version" || { echo "Installer version missing"; exit 1; }
+          tag="v$version"
+          if [[ "$REF" == refs/tags/* ]]; then
+            test "${REF#refs/tags/}" = "$tag" || { echo "Tag/version mismatch"; exit 1; }
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then echo "Release $tag exists; refusing overwrite"; exit 1; fi
           gh release create "$tag" release-assets/* --target "$COMMIT" --title "ParaNoya $tag" --notes "Windows x64 kurulum paketi. Windows runner üzerinde testler, kurulum, açılış, yeniden kurulum ve kaldırma kontrolleri başarıyla tamamlandı. Kişisel finans verileri pakete dahil değildir. Kurulum dosyası kod imzalı değildir."
