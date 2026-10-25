@@ -10,9 +10,10 @@ import sys
 
 from central_updates import UpdateError, load_config
 from update_handoff import prepare_handoff
+from update_process_exit import wait_for_pid_exit
 
 
-def execute_after_exit(plan, item, *, confirmed=False, wait_for_exit=None, run_installer=None,
+def execute_after_exit(plan, item, *, confirmed=False, app_pid=None, wait_for_exit=None, run_installer=None,
                        restart_application=None):
     """Run a previously authenticated installer ONLY after the old app has exited.
 
@@ -29,6 +30,10 @@ def execute_after_exit(plan, item, *, confirmed=False, wait_for_exit=None, run_i
         raise UpdateError("Güvenilir kurulum planı bulunamadı")
     if plan.get("requires_app_exit") is not True or plan.get("requires_installer_ui") is not True:
         raise UpdateError("Kurulum güvenlik koşulları eksik")
+    if wait_for_exit is None:
+        if type(app_pid) is not int or app_pid <= 0:
+            raise UpdateError("Uygulamanın işlem numarası geçersiz")
+        wait_for_exit = lambda: wait_for_pid_exit(app_pid)
     if not callable(wait_for_exit):
         raise UpdateError("Uygulama kapanış doğrulaması sağlanmadı")
     installer = Path(plan["installer"]).resolve()
