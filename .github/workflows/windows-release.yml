@@ -1,0 +1,97 @@
+name: Windows installer
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish v1.2.5.2 after installer checks
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+          cache: pip
+      - name: Reject private data files
+        shell: pwsh
+        run: |
+          $bad = git ls-files | Where-Object { $_ -match '(^|/)\.env|\.db($|-)|\.sqlite|\.pem$|\.key$|(^|/)(backups|product_documents|AileFinans)/' }
+          if ($bad) { throw "Private data files must not be tracked: $bad" }
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-build.txt
+      - name: Unit tests
+        run: python -m unittest discover -v
+      - name: Source startup check
+        shell: pwsh
+        run: |
+          python ailefinans.py --smoke-test "$env:RUNNER_TEMP\smoke-source.json"
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path "$env:RUNNER_TEMP\smoke-source.json")) { throw "Source startup check failed" }
+      - name: Build application
+        run: python -m PyInstaller --noconfirm --clean ParaNoya.spec
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { throw "Inno Setup 6 missing from Windows runner" }
+          & $iscc /DAppVersion=1.2.5.2 installer\ParaNoya.iss
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+      - name: Verify install, startup, upgrade and uninstall
+        shell: pwsh
+        run: |
+          $setup = (Get-Item installer-output\*-Setup.exe).FullName
+          $install = Join-Path $env:RUNNER_TEMP 'ParaNoya-installed'
+          $report = Join-Path $env:RUNNER_TEMP 'smoke-installed.json'
+          $log = Join-Path $env:RUNNER_TEMP 'installer.log'
+          foreach ($pass in 1..2) {
+            $p = Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=$install", "/LOG=$log") -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Installation failed: $($p.ExitCode)" }
+          }
+          $p = Start-Process -FilePath "$install\ParaNoya.exe" -ArgumentList @('--smoke-test', $report) -PassThru
+          if (!$p.WaitForExit(120000)) { $p.Kill(); throw 'Installed app timed out' }
+          if ($p.ExitCode -ne 0 -or !(Test-Path $report)) { throw "Installed app check failed: $($p.ExitCode)" }
+          if (!(Get-Content $report -Raw | ConvertFrom-Json).ok) { throw 'Invalid startup report' }
+          $p = Start-Process -FilePath "$install\unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw 'Uninstall failed' }
+          if (Test-Path "$install\ParaNoya.exe") { throw 'App remains after uninstall' }
+          Copy-Item $report installer-output\verification.json
+          $file = Get-Item $setup
+          "$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLower())  $($file.Name)" | Set-Content installer-output\SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ParaNoya-Windows-x64
+          path: installer-output/*
+          if-no-files-found: error
+          retention-days: 30
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ParaNoya-Windows-x64
+          path: release-assets
+      - name: Publish verified installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          tag="v1.2.5.2"
+          if [[ "$REF" == refs/tags/* ]]; then tag="${REF#refs/tags/}"; fi
+          test "$tag" = v1.2.5.2 || { echo "Installer version must match tag"; exit 1; }
+          gh release create "$tag" release-assets/* --target "$COMMIT" --title "ParaNoya $tag" --notes "Windows x64 kurulum paketi. Windows runner üzerinde testler, kurulum, açılış, yeniden kurulum ve kaldırma kontrolleri başarıyla tamamlandı. Kişisel finans verileri pakete dahil değildir. Kurulum dosyası kod imzalı değildir."
