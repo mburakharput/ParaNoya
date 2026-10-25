@@ -87,6 +87,22 @@ class PostExitRunnerTests(unittest.TestCase):
                 self.invoke()
         self.run.assert_not_called()
 
+    def test_waiter_exception_does_not_start_installer(self):
+        def no_access():
+            raise OSError("cannot inspect target process")
+        with self.assertRaises(OSError):
+            self.invoke(wait_for_exit=no_access)
+        self.run.assert_not_called()
+        self.restart.assert_not_called()
+
+    def test_reverification_after_exit_before_install(self):
+        events = []
+        with patch("update_runner.prepare_handoff", side_effect=lambda *a, **kw: (events.append("verify"), self.plan)[1]):
+            self.invoke(wait_for_exit=lambda: events.append("exit") or True,
+                        run_installer=lambda cmd: events.append("install") or 0,
+                        restart_application=lambda executable: events.append("restart"))
+        self.assertEqual(events, ["exit", "verify", "install", "restart"])
+
     def test_disabled_updates_block_execution(self):
         with patch("update_runner.load_config", return_value={"updates_enabled": False}):
             with self.assertRaises(UpdateError):
