@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.5.2"
+  #define AppVersion "1.2.5.3"
 #endif
 [Setup]
 AppId={{22874636-8296-42A7-8E61-56C5242C838F}
@@ -16,6 +16,7 @@ OutputBaseFilename=ParaNoya-{#AppVersion}-Windows-x64-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\assets\paranoya.ico
 UninstallDisplayIcon={app}\ParaNoya.exe
 CloseApplications=yes
 [Files]
