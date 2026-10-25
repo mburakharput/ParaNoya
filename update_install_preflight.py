@@ -4,6 +4,7 @@ This module does not start a process, close the app or modify user data.
 """
 import hashlib
 import os
+import tempfile
 from pathlib import Path
 import sys
 
@@ -37,7 +38,18 @@ def check_install_preflight(installer, item, *, executable=None, local_app_data=
     data_dir = Path(finance_data_dir or DB_DIR).resolve()
     if data_dir == expected_folder or expected_folder in data_dir.parents:
         raise UpdateError("Finansal veriler uygulama klasörünün içinde; yükseltme durduruldu")
-    path = Path(installer).resolve()
+    original = Path(installer).absolute()
+    path = original.resolve()
+    if original.is_symlink() or original != path:
+        raise UpdateError("Kurulum yolu bağlantı veya yönlendirme içeriyor")
+    if not path.is_file():
+        raise UpdateError("Kurulum dosyası bulunamadı")
+    # Only accept files placed in the isolated verified download directory.
+    folder = path.parent
+    trusted_temp = Path(tempfile.gettempdir()).resolve()
+    if (not folder.name.startswith("paranoya-verified-")
+            or folder.parent.resolve() != trusted_temp):
+        raise UpdateError("Kurulum dosyası doğrulanmış indirme klasöründe değil")
     name = item.get("name")
     version = item.get("version", "")
     if not isinstance(version, str) or version_tuple(version) <= version_tuple(config["version"]):
