@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+installer-output/
+*.db
+*.db-*
+*.sqlite*
+.env*
+*.pem
+*.key
+backups/
+documents/
+AileFinans/
+smoke-*.json
