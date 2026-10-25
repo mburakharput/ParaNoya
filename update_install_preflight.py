@@ -4,6 +4,7 @@ This module does not start a process, close the app or modify user data.
 """
 import hashlib
 import os
+import re
 import tempfile
 from pathlib import Path
 import sys
@@ -60,7 +61,7 @@ def check_install_preflight(installer, item, *, executable=None, local_app_data=
     digest = item.get("sha256")
     if path.name != name or not isinstance(size, int) or isinstance(size, bool):
         raise UpdateError("Kurulum dosyası bilgileri geçersiz")
-    if not isinstance(digest, str) or len(digest) != 64:
+    if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
         raise UpdateError("Kurulum özeti geçersiz")
     # Recheck the signed release metadata immediately before handoff.
     # A matching local SHA-256 is not sufficient without publisher authentication.
