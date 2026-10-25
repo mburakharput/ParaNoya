@@ -47,6 +47,31 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         self.assertEqual(self.check().resolve(), self.install.resolve())
         self.assertEqual(db.read_bytes(), b"do not touch")
 
+    def test_failed_signature_preserves_finance_database(self):
+        data = self.base / "AileFinans"
+        data.mkdir()
+        db = data / "ailefinans.db"
+        original = b"important user finances"
+        db.write_bytes(original)
+        with patch("update_install_preflight.authenticate_candidate",
+                   side_effect=UpdateError("publisher signature invalid")):
+            with self.assertRaises(UpdateError):
+                self.check()
+        self.assertEqual(db.read_bytes(), original)
+        self.assertTrue(self.exe.is_file())
+
+    def test_failed_hash_preserves_finance_database(self):
+        data = self.base / "AileFinans"
+        data.mkdir()
+        db = data / "ailefinans.db"
+        original = b"important user finances"
+        db.write_bytes(original)
+        self.installer.write_bytes(b"tampered setup")
+        with self.assertRaises(UpdateError):
+            self.check()
+        self.assertEqual(db.read_bytes(), original)
+        self.assertTrue(self.exe.is_file())
+
     def test_rejects_data_inside_installed_app(self):
         with self.assertRaises(UpdateError):
             self.check(finance_data_dir=self.install / "user-data")
