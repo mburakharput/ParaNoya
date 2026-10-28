@@ -6,7 +6,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from PySide6.QtCore import Qt, QSize, QEventLoop, QRectF, QDate, QUrl, QEvent
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen, QDesktopServices
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QPainterPath, QColor, QFont, QPen, QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QComboBox, QStackedWidget, QFormLayout, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QDialog, QDialogButtonBox, QDoubleSpinBox,
@@ -26,6 +26,29 @@ from finance_core import (DB_DIR, DB_PATH, money, open_db, migrate, get_profiles
 
 
 from PySide6.QtCore import QThread, Signal
+
+def circular_mascot(path, size=60):
+    """Crop the actual raster to a circle, not just its surrounding label."""
+    density=3
+    canvas=QPixmap(size*density,size*density)
+    canvas.setDevicePixelRatio(density)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter=QPainter(canvas)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor('#ffffff'))
+    painter.drawEllipse(QRectF(0,0,size,size))
+    clip=QPainterPath()
+    clip.addEllipse(QRectF(3,3,size-6,size-6))
+    painter.setClipPath(clip)
+    source=QPixmap(str(path)).scaled((size-6)*density,(size-6)*density,Qt.AspectRatioMode.KeepAspectRatioByExpanding,Qt.TransformationMode.SmoothTransformation)
+    if not source.isNull():
+        width=source.width()/density;height=source.height()/density
+        painter.drawPixmap(QRectF((size-width)/2,(size-height)/2,width,height),source,QRectF(source.rect()))
+    painter.end()
+    return canvas
+
 
 class LogoDownloadWorker(QThread):
     finished_result = Signal(int, int, object)
@@ -316,7 +339,7 @@ class App(QMainWindow):
         brand_panel.setMinimumHeight(80);brand_panel.setMaximumHeight(94)
         mascot=QLabel();mascot.setObjectName('mascotAvatar');mascot.setFixedSize(60,60)
         mascot.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        mascot.setPixmap(QPixmap(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')).scaled(48,48,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
+        mascot.setPixmap(circular_mascot(Path(__file__).parent/'assets'/'paranoya_mascot.png'))
         brand_row.addWidget(mascot)
         brand_text=QVBoxLayout();brand_text.setSpacing(4)
         brand=QLabel('<span style="color:#ffffff">Para</span><span style="color:#2ad6ca">Noya</span>');brand.setTextFormat(Qt.TextFormat.RichText);brand.setObjectName('brand')

@@ -50,6 +50,14 @@ class BankVisualTests(unittest.TestCase):
                 self.assertLessEqual(pix.height()/pix.devicePixelRatio(),24)
                 self.assertFalse(pix.isNull())
 
+    def test_mascot_image_is_circular_with_white_rim(self):
+        from ailefinans import circular_mascot
+        image=circular_mascot(Path(__file__).parent/'assets'/'paranoya_mascot.png').toImage()
+        self.assertEqual(image.pixelColor(0,0).alpha(),0)
+        self.assertEqual(image.pixelColor(image.width()-1,0).alpha(),0)
+        self.assertEqual(image.pixelColor(image.width()//2,4).name(),'#ffffff')
+        self.assertGreater(image.pixelColor(image.width()//2,image.height()//2).alpha(),200)
+
     def test_missing_logo_detail_uses_fixed_size_fallback(self):
         from PySide6.QtWidgets import QLabel
         host=SimpleNamespace(_bank_icon=lambda name: App._bank_icon(None,name),devicePixelRatioF=lambda:2)
