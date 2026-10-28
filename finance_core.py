@@ -8,6 +8,7 @@ from decimal import Decimal
 
 DB_DIR = Path(os.environ['PARANOYA_DATA_DIR']) if os.environ.get('PARANOYA_DATA_DIR') else Path.home() / 'AileFinans'
 DB_PATH = DB_DIR / 'ailefinans.db'
+MAX_SCHEMA_VERSION = 8
 
 
 def money(cents):
@@ -191,9 +192,12 @@ def transfer(db, profile, from_account, to_account, cents, note=''):
 _migrate_previous = migrate
 def migrate(path=DB_PATH):
     path=Path(path)
+    version=0
     if path.exists():
         with closing(open_db(path)) as db, db:
             version=db.execute('PRAGMA user_version').fetchone()[0]
+            if version > MAX_SCHEMA_VERSION:
+                raise ValueError('Veritabanı daha yeni bir ParaNoya sürümüne ait; güncel uygulamayı kullanın.')
             if version < 4 and db.execute("SELECT 1 FROM sqlite_master WHERE name='accounts'").fetchone():
                 stamp=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
                 with closing(sqlite3.connect(path.with_name(f'{path.stem}.v03_backup_{stamp}{path.suffix}'))) as backup, backup:
@@ -203,7 +207,9 @@ def migrate(path=DB_PATH):
     from v04_core import upgrade
     db=open_db(path)
     try:
-        upgrade(db)
+        # Do not lower the full application's schema marker on every startup.
+        if version < 4:
+            upgrade(db)
         from kmh_core import migrate_kmh
         migrate_kmh(db)
     finally:db.close()

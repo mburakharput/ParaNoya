@@ -22,11 +22,11 @@ def get_state(db,kind,record_id):
 
 def dependencies(db,kind,record_id):
     if kind=='account':
-        checks=[('Gelir/gider','transactions','account_id'),('Gelen transfer','transfers','to_account_id'),('Giden transfer','transfers','from_account_id'),('Kart ödemesi','card_payments','account_id'),('KMH','overdraft_accounts','account_id')]
+        checks=[('Gelir/gider','transactions','account_id'),('Gelen transfer','transfers','to_account_id'),('Giden transfer','transfers','from_account_id'),('Kart ödemesi','card_payments','account_id'),('KMH','overdraft_accounts','account_id'),('KMH taksit ödemesi','kmh_payments','from_account_id')]
     elif kind=='card':
         checks=[('Alışveriş','card_purchases','card_id'),('Kart ödemesi','card_payments','card_id')]
     elif kind=='kmh':
-        checks=[('KMH hareketi','overdraft_events','overdraft_id')]
+        checks=[('KMH hareketi','overdraft_events','overdraft_id'),('Taksitli KMH','kmh_loans','overdraft_id')]
     else: raise ValueError('Bilinmeyen kayıt türü')
     result=[]
     for label,table,column in checks:

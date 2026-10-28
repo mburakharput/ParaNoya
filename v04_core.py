@@ -52,15 +52,20 @@ def month_add(d,n):
     y=d.year+(d.month-1+n)//12; m=(d.month-1+n)%12+1
     return date(y,m,min(d.day,calendar.monthrange(y,m)[1]))
 
+def due_in_month(origin, offset, due_day):
+    month = month_add(origin.replace(day=1), offset)
+    return month.replace(day=min(due_day, calendar.monthrange(month.year, month.month)[1]))
+
+
 def first_due(purchase_date,statement_day,due_day):
     # Simple projected schedule: the first payment due date is the first 'due_day' strictly after purchase.
     # Not bank-specific; statements can differ. UI labels it an estimated schedule.
     d=date(purchase_date.year,purchase_date.month,min(due_day,calendar.monthrange(purchase_date.year,purchase_date.month)[1]))
-    if d<=purchase_date: d=month_add(date(purchase_date.year,purchase_date.month,min(due_day,calendar.monthrange(purchase_date.year,purchase_date.month)[1])),1)
+    if d<=purchase_date: d=due_in_month(purchase_date,1,due_day)
     return d
 
 def purchase(db,profile,card_id,category,description,amount,installments,purchased=None):
-    if amount<=0 or not 1<=installments<=60 or not category.strip():
+    if amount<=0 or not 1<=installments<=60 or amount<installments or not category.strip():
         raise ValueError('Alışveriş tutarı/taksit/kategori geçersiz.')
     row=db.execute('SELECT statement_day,due_day FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
     if not row: raise ValueError('Kart bu çalışma alanına ait değil.')
@@ -69,7 +74,7 @@ def purchase(db,profile,card_id,category,description,amount,installments,purchas
     q,r=divmod(amount,installments)
     with db:
         cursor=db.execute('INSERT INTO card_purchases(card_id,category,description,total_cents,installments,purchase_date) VALUES (?,?,?,?,?,?)',(card_id,category.strip(),description.strip(),amount,installments,day.isoformat()))
-        db.executemany('INSERT INTO card_installments(purchase_id,sequence,due_date,amount_cents) VALUES (?,?,?,?)',[(cursor.lastrowid,i+1,month_add(first,i).isoformat(),q+(1 if i<r else 0)) for i in range(installments)])
+        db.executemany('INSERT INTO card_installments(purchase_id,sequence,due_date,amount_cents) VALUES (?,?,?,?)',[(cursor.lastrowid,i+1,due_in_month(first,i,row[1]).isoformat(),q+(1 if i<r else 0)) for i in range(installments)])
     return cursor.lastrowid
 
 def pay_card(db,profile,card_id,account_id,amount):

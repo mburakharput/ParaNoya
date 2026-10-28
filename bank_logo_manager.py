@@ -45,12 +45,14 @@ def missing_logos(root=None):
     folder=logo_dir(root)
     return sorted({slug for slug in LOGO_IDS.values() if slug and not (folder/(slug+'.svg')).is_file()})
 
-def fetch_logos(root=None, timeout=12):
+def fetch_logos(root=None, timeout=12, cancelled=None):
     """Explicitly invoked downloader: return counts and errors; never erase existing files."""
     dest = logo_dir(root)
     dest.mkdir(parents=True, exist_ok=True)
     downloaded, present, failures = 0, 0, []
     for slug in sorted({s for s in LOGO_IDS.values() if s}):
+        if cancelled is not None and cancelled():
+            break
         path = dest / (slug + '.svg')
         if path.is_file():
             present += 1
