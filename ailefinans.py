@@ -1258,7 +1258,7 @@ class App(QMainWindow):
         choices=cards(self.db,self.pid()) if typ=='statement' else accs
         if not choices:QMessageBox.warning(self,'Hesap / kart gerekli','Önce ilgili banka hesabını veya kredi kartını ekleyin.');return
         d,form=self._form('Belgeden finans kaydı · kontrol ve onay')
-        info=QLabel('Ekstre alışverişi kart borcuna eklenir; banka bakiyesinden para düşülmez. Kart ödemesi, iade ve devreden borç satırlarını aktarmayın.' if typ=='statement' else 'Yalnız gerçekleşmiş ödeme / hesaba geçen maaşı onaylayın. Ödenmemiş fatura henüz gider değildir.')
+        info=QLabel('Ekstre alışverişi kart borcuna eklenir; banka bakiyesinden para düşülmez. Ödeme, iade, devir ve mevcut planın taksit satırlarını aktarmayın.' if typ=='statement' else 'Yalnız gerçekleşmiş ödeme / hesaba geçen maaşı onaylayın. Ödenmemiş fatura henüz gider değildir.')
         info.setWordWrap(True);form.addRow(info)
         account=QComboBox()
         for item in choices:account.addItem(item[1],item[0])

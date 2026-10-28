@@ -148,6 +148,8 @@ def approve_document_entry(db, profile, doc_id, *, account_id=None, card_id=None
                 raise ValueError('Pozitif alışveriş satırı seçin; ödeme ve iadeler ayrı işlenmeli')
             if re.search(r'ödeme|iade|devir|devreden|önceki\s+dönem',candidate['description'],re.I):
                 raise ValueError('Ödeme, iade ve devreden borç alışveriş olarak aktarılamaz')
+            if re.search(r'taksit|installment|\b\d+\s*/\s*\d+\b',candidate['description'],re.I):
+                raise ValueError('Ekstre taksitini yeni alışveriş gibi eklemeyin; mevcut taksit planıyla karşılaştırın')
             card=db.execute('SELECT statement_day,due_day FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
             if not card:raise ValueError('Kart bu profile ait değil')
             # A matching date+amount is ambiguous: link only if description also agrees.

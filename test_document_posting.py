@@ -77,7 +77,7 @@ class DocumentPostingTests(unittest.TestCase):
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM card_purchases').fetchone()[0],1)
 
     def test_statement_cannot_post_total_payment_or_negative_row(self):
-        for text,line in [('Dönem borcu: 125,00',1),('29.10.2026;Kart ödemesi;125,00',1),('29.10.2026;Market;-125,00',1)]:
+        for text,line in [('Dönem borcu: 125,00',1),('29.10.2026;Kart ödemesi;125,00',1),('29.10.2026;Market;-125,00',1),('29.10.2026;Mobilya 2/6 taksit;125,00',1)]:
             with self.subTest(text=text):
                 did=self.stage_text(text,'statement')
                 with self.assertRaises(ValueError):self.post(did,card_id=1,source_line=line)
