@@ -18,7 +18,7 @@ from record_manager import migrate_record_state, get_state, change_state, depend
 from card_catalog import load_catalog, search_catalog
 from bank_logo_manager import logo_path, fetch_logos
 from bank_logo_renderer import bank_icon, menu_icon
-from document_center import TYPES, migrate_documents, stage, list_docs, approve_salary
+from document_center import TYPES, migrate_documents, stage, list_docs, approve_salary, approve_document_entry
 from kmh_core import migrate_kmh, closing_due, set_overdraft, overdraft, use_overdraft, add_installment_loan, monthly_calendar, pay_installment
 from v04_core import month_add, cards,create_card,purchase,pay_card,upcoming,shared_history,edit_shared_split
 from finance_core import (DB_DIR, DB_PATH, money, open_db, migrate, get_profiles, add_account,
@@ -607,7 +607,7 @@ class App(QMainWindow):
         self.stack.addWidget(calpage)
         documents_page=QWidget()
         dv=QVBoxLayout(documents_page)
-        dv.addWidget(QLabel('Belgeler yerel okunur. Kredi kartı / KMH belgeleri yalnızca incelemeye alınır.'))
+        dv.addWidget(QLabel('Bordro, fatura ve ekstre yerel okunur; bilgileri kontrol edip onaylayınca finans kaydı oluşur.'))
         upload=QPushButton('+ Belge yükle (PDF, CSV, Excel, TXT)')
         upload.clicked.connect(self.import_document)
         dv.addWidget(upload,alignment=Qt.AlignmentFlag.AlignLeft)
@@ -619,8 +619,8 @@ class App(QMainWindow):
         self.doc_preview=self.make_table(['Satır','Tarih','Açıklama / Taksit','Tutar','Durum'])
         dv.addWidget(self.doc_preview)
         dv.addWidget(QLabel('Önizleme finans kaydı oluşturmaz. Tüm satırlar bankanın belgesiyle karşılaştırılmalıdır.'))
-        salary=QPushButton('Seçilen bordroyu gelir olarak onayla')
-        salary.clicked.connect(self.post_salary_document)
+        salary=QPushButton('Seçili belgeden gelir / gider oluştur')
+        salary.clicked.connect(self.post_document_entry)
         dv.addWidget(salary,alignment=Qt.AlignmentFlag.AlignLeft)
         self.stack.addWidget(documents_page)
         # Düzenli fatura ve abonelik modülü: tüm seçimler içerik alanındadır.
@@ -1028,10 +1028,13 @@ class App(QMainWindow):
         self.acc_positive_balance.setText(money(sum(max(0,a[3]) for a in accs)))
         self._selection_changed('account')
         self.update_account_details()
-        rows = self.db.execute('''SELECT t.recorded_at,t.kind,a.name,t.category,t.description,t.amount_cents
+        rows = self.db.execute('''SELECT * FROM (SELECT t.recorded_at AS happened,t.kind,a.name,t.category,t.description,t.amount_cents
             FROM transactions t JOIN accounts a ON a.id=t.account_id
-            WHERE t.profile_id=? ORDER BY t.id DESC''', (pid,)).fetchall()
-        shown = [(when, 'Gelir' if kind == 'income' else 'Gider', acct, cat, note,
+            WHERE t.profile_id=?
+            UNION ALL SELECT p.purchase_date,'card_expense',c.name,p.category,p.description,p.total_cents
+            FROM card_purchases p JOIN credit_cards c ON c.id=p.card_id WHERE c.profile_id=?)
+            ORDER BY happened DESC''', (pid,pid)).fetchall()
+        shown = [(when, 'Gelir' if kind == 'income' else ('Kart gideri' if kind=='card_expense' else 'Gider'), acct, cat, note,
                   ('+' if kind == 'income' else '-') + money(amt))
                  for when, kind, acct, cat, note, amt in rows]
         self.fill_table(self.tx_table, shown)
@@ -1205,6 +1208,17 @@ class App(QMainWindow):
             note='\n'.join(parsed['warnings']) or 'Belge incelemeye alındı.'
             QMessageBox.information(self,'Belge alındı',('Yeni kayıt' if created else 'Bu belge daha önce yüklendi')+f' (#{doc_id})\n'+note)
             self.refresh()
+            for r in range(self.doc_table.rowCount()):
+                if int(self.doc_table.item(r,0).text())==doc_id:
+                    self.doc_table.selectRow(r)
+                    break
+            if created and parsed['type'] in ('payslip','invoice','statement'):
+                self.select_page(9)
+                for r in range(self.doc_table.rowCount()):
+                    if int(self.doc_table.item(r,0).text())==doc_id:
+                        self.doc_table.selectRow(r)
+                        break
+                self.post_document_entry()
         except Exception as exc:QMessageBox.warning(self,'Belge alınamadı',str(exc))
 
     def preview_document_rows(self):
@@ -1228,31 +1242,66 @@ class App(QMainWindow):
         if warnings: self.doc_preview.setToolTip('\n'.join(warnings))
 
     def post_salary_document(self):
+        self.post_document_entry()
+
+    def post_document_entry(self):
         row=self.doc_table.currentRow()
         if row<0:
-            QMessageBox.information(self,'Belge seç','Önce tabloda bir bordro seçin.');return
+            QMessageBox.information(self,'Belge seç','Önce tabloda bir belge seçin.');return
         doc_id=int(self.doc_table.item(row,0).text())
         doc=self.db.execute('SELECT doc_type,status,extracted_json FROM imported_documents WHERE id=? AND profile_id=?',(doc_id,self.pid())).fetchone()
-        if not doc or doc[0]!='payslip' or doc[1]!='pending':
-            QMessageBox.warning(self,'İşlem yapılamadı','Sadece bekleyen maaş bordrosu gelir olarak işlenebilir.');return
+        if not doc or doc[0] not in ('payslip','invoice','statement') or doc[1]=='posted':
+            QMessageBox.warning(self,'İşlem yapılamadı','Bekleyen bordro, fatura veya ekstre satırı seçin.');return
         import json
         parsed=json.loads(doc[2]);accs=accounts_with_balances(self.db,self.pid())
-        if not accs:QMessageBox.warning(self,'Hesap gerekli','Önce bir banka hesabı açın.');return
-        d,form=self._form('Bordro geliri doğrula')
+        typ=doc[0]
+        choices=cards(self.db,self.pid()) if typ=='statement' else accs
+        if not choices:QMessageBox.warning(self,'Hesap / kart gerekli','Önce ilgili banka hesabını veya kredi kartını ekleyin.');return
+        d,form=self._form('Belgeden finans kaydı · kontrol ve onay')
+        info=QLabel('Ekstre alışverişi kart borcuna eklenir; banka bakiyesinden para düşülmez. Kart ödemesi, iade ve devreden borç satırlarını aktarmayın.' if typ=='statement' else 'Yalnız gerçekleşmiş ödeme / hesaba geçen maaşı onaylayın. Ödenmemiş fatura henüz gider değildir.')
+        info.setWordWrap(True);form.addRow(info)
         account=QComboBox()
-        for aid,name,kind,balance in accs:account.addItem(name,aid)
+        for item in choices:account.addItem(item[1],item[0])
         amount=QDoubleSpinBox();amount.setMaximum(100000000);amount.setDecimals(2)
-        amount.setValue(parsed['fields'].get('net',0)/100)
+        amount.setSuffix(' ₺');amount.setValue(parsed['fields'].get('net' if typ=='payslip' else 'total',0)/100)
         period=QLineEdit(str(parsed['fields'].get('period','Dönem belirtilmedi')))
-        paid=QCheckBox('Bu net maaşın hesaba geçtiğini doğruladım')
-        form.addRow('Banka hesabı',account);form.addRow('Net tutar',amount)
-        form.addRow('Bordro dönemi',period);form.addRow(paid)
+        category=QLineEdit('Maaş' if typ=='payslip' else ('Faturalar' if typ=='invoice' else 'Kart alışverişi'))
+        fields=parsed['fields']
+        desc=QLineEdit(('Fatura: '+str(fields.get('issuer',''))+' '+str(fields.get('invoice_number',''))).strip() if typ=='invoice' else 'Bordro')
+        when=QDateEdit();when.setCalendarPopup(True);when.setDisplayFormat('dd.MM.yyyy');when.setDate(QDate.currentDate())
+        source=QComboBox()
+        if typ=='statement':
+            linked={r[0] for r in self.db.execute('SELECT row_key FROM document_posting_links WHERE document_id=?',(doc_id,))}
+            candidates=[x for x in parsed.get('candidates',[]) if str(x['source_line']) not in linked and x['amount_cents']>0]
+            if not candidates:
+                QMessageBox.information(self,'Satır bulunamadı','Aktarılabilir alışveriş satırı yok. Metin içeren PDF veya Tarih;Açıklama;Tutar sütunlu CSV kullanın. Ekstre toplamı gider olarak aktarılmaz.');return
+            for item in candidates:source.addItem(f"{item['date']} · {item['description']} · {money(item['amount_cents'])}",item)
+            def choose_line(*_):
+                item=source.currentData();amount.setValue(item['amount_cents']/100)
+                desc.setText(item['description']);when.setDate(QDate.fromString(item['date'],'yyyy-MM-dd'))
+            source.currentIndexChanged.connect(choose_line);choose_line()
+            form.addRow('Alışveriş satırı',source)
+        form.addRow('Kredi kartı' if typ=='statement' else 'Banka / nakit hesabı',account)
+        form.addRow('Tutar',amount);form.addRow('Alışveriş tarihi' if typ=='statement' else 'Hesaba geçiş / ödeme tarihi',when)
+        form.addRow('Kategori',category)
+        if typ=='payslip':form.addRow('Bordro dönemi',period)
+        else:form.addRow('Açıklama',desc)
+        paid=QCheckBox('Bilgileri kontrol ettim; bu bir alışveriştir, ödeme/iade/devir değildir' if typ=='statement' else 'Ödemenin gerçekleştiğini ve bilgilerin doğru olduğunu onaylıyorum')
+        form.addRow(paid)
+        duplicate_note=QLabel('Aynı tarih, tutar ve açıklamayla kayıt varsa mevcut kayda bağlanır; tekrar gider/gelir oluşturulmaz.')
+        duplicate_note.setWordWrap(True);form.addRow(duplicate_note)
         self._buttons(d,form)
         if d.exec()!=QDialog.DialogCode.Accepted:return
         try:
-            approve_salary(self.db,self.pid(),doc_id,account.currentData(),from_spin(amount),period.text(),paid.isChecked())
+            _,created=approve_document_entry(self.db,self.pid(),doc_id,
+                account_id=account.currentData() if typ!='statement' else None,
+                card_id=account.currentData() if typ=='statement' else None,
+                cents=from_spin(amount),day=when.date().toString('yyyy-MM-dd'),
+                category=category.text(),description=desc.text(),confirmed=paid.isChecked(),
+                source_line=source.currentData()['source_line'] if typ=='statement' else None,period=period.text())
             self.refresh()
-        except Exception as exc:QMessageBox.warning(self,'Gelir kaydedilemedi',str(exc))
+            QMessageBox.information(self,'Belge işlendi','Finans kaydı oluşturuldu.' if created else 'Mevcut kayda bağlandı; tekrar kayıt oluşturulmadı.')
+        except Exception as exc:QMessageBox.warning(self,'Kayıt oluşturulamadı',str(exc))
 
     def create_account(self):
         dialog = AddAccountDialog(self)
@@ -1379,6 +1428,8 @@ class App(QMainWindow):
 
     def _buttons(self,d,f):
         b=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        b.button(QDialogButtonBox.StandardButton.Ok).setText('Onayla')
+        b.button(QDialogButtonBox.StandardButton.Cancel).setText('İptal')
         b.accepted.connect(d.accept);b.rejected.connect(d.reject);f.addRow(b)
 
     def _amount(self,initial=100):
