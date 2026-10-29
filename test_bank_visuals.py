@@ -37,6 +37,14 @@ class BankVisualTests(unittest.TestCase):
         self.assertNotIn('Turkish Bank',list_bank_names())
         self.assertNotIn('Turkish Bank',LOGO_IDS)
 
+    def test_raster_logo_cannot_paint_over_menu_text_at_different_dpr(self):
+        from PySide6.QtGui import QPixmap,QIcon,QColor
+        from unittest.mock import patch
+        large=QPixmap(288,72);large.fill(QColor('red'));large.setDevicePixelRatio(1)
+        with patch('bank_logo_renderer.bank_icon',return_value=QIcon(large)):
+            image=menu_icon(None).pixmap(QSize(110,24),3).toImage()
+        self.assertTrue(all(image.pixelColor(x,y).alpha()==0 for x in range(288,330) for y in range(72)))
+
     def test_clipped_wordmark_does_not_become_solid_rectangle(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'sekerbank.svg'

@@ -95,6 +95,10 @@ def menu_icon(path):
     canvas.fill(Qt.GlobalColor.transparent)
     painter = QPainter(canvas)
     from PySide6.QtCore import QSize
-    painter.drawPixmap(0, 0, source.pixmap(QSize(96, 24), 3))
+    # QIcon can return a raster pixmap with a different DPR on Windows.
+    # Always draw into an explicit logical rectangle so the text gutter stays clear.
+    logo=source.pixmap(QSize(96,24),3)
+    painter.setClipRect(QRectF(0,0,96,24))
+    painter.drawPixmap(QRectF(0,0,96,24),logo,QRectF(logo.rect()))
     painter.end()
     return QIcon(canvas)
