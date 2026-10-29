@@ -64,6 +64,13 @@ class UpdateAgentTests(unittest.TestCase):
     def test_source_helper_reports_own_pid(self):
         with patch('update_agent.sys.frozen',False,create=True),patch('update_agent.os.getpid',return_value=654):
             self.assertEqual(launcher_pid(),654)
+    def test_helper_uses_verified_plan_path_instead_of_default_install_folder(self):
+        self.plan['restart_executable']=str(self.root/'custom'/'ParaNoya.exe')
+        path,_=self.request()
+        with patch.dict(os.environ,{'LOCALAPPDATA':str(self.root)}),patch('update_agent.prepare_handoff',return_value=self.plan) as preflight,patch('update_agent.execute_after_exit',return_value=True) as runner:
+            self.assertTrue(run_request(path))
+        self.assertEqual(preflight.call_args.kwargs['executable'],Path(self.plan['restart_executable']))
+        self.assertEqual(runner.call_args.kwargs['executable'],Path(self.plan['restart_executable']))
     def test_selftest_report_identifies_launched_process(self):
         report=self.root/'selftest.json'
         with patch('update_agent.launcher_pid',return_value=321),patch('update_agent.run_request') as run:

@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 
 from central_updates import UpdateError, load_config, version_tuple, authenticate_candidate
+from installed_app import trusted_install_folder
 
 def check_install_preflight(installer, item, *, executable=None, local_app_data=None,
                             finance_data_dir=None, frozen=None):
@@ -22,18 +23,14 @@ def check_install_preflight(installer, item, *, executable=None, local_app_data=
         frozen = bool(getattr(sys, "frozen", False))
     if not frozen:
         raise UpdateError("Yalnızca kurulmuş uygulama güncellenebilir")
-    executable = Path(executable or sys.executable).resolve()
+    executable = Path(executable or sys.executable)
     if executable.name.casefold() != "paranoya.exe":
         raise UpdateError("Uygulama dosyası eşleşmiyor")
     if local_app_data is None:
         local_app_data = os.environ.get("LOCALAPPDATA")
     if not local_app_data:
         raise UpdateError("Kullanıcı kurulum klasörü belirlenemedi")
-    expected_folder = (Path(local_app_data) / "Programs" / "ParaNoya").resolve()
-    if executable.parent != expected_folder:
-        raise UpdateError("Mevcut kurulum klasörü doğrulanamadı")
-    if not (expected_folder / "unins000.exe").is_file():
-        raise UpdateError("Mevcut kurulumun kaldırma kaydı yok")
+    expected_folder = trusted_install_folder(executable,local_app_data)
     # Finance data is never part of the installed application tree.
     from finance_core import DB_DIR
     data_dir = Path(finance_data_dir or DB_DIR).resolve()

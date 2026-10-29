@@ -1,4 +1,17 @@
-# ParaNoya v1.2.5.7
+# ParaNoya v1.2.5.8
+
+## 1.2.5.8 — mevcut kurulum klasöründe güncelleme
+
+Program Files ve özel klasörlerdeki kurulumlar ParaNoya'nın sabit Windows kurulum
+kaydından doğrulanır; güncelleme aynı klasörde ve aynı kullanıcı/tüm kullanıcılar
+kapsamında sürer. Gerekirse yalnız doğrulanmış kurulum dosyası Windows UAC onayıyla
+yükseltilir. Uygulama ve yardımcı normal kullanıcı olarak çalışmaya devam eder.
+UAC beklerken kurulum dosyası yazma/silmeye karşı kilitlenir ve özeti tekrar denetlenir.
+Onay iptal edilirse mevcut uygulama yeniden açılır. Kayıtsız portable kopyalar
+otomatik kurulum için kabul edilmez.
+
+1.2.5.6/1.2.5.7'nin eski klasör denetimi Program Files kurulumunu reddediyorsa
+bu sürüme bir kez elle geçilmelidir; programı kaldırmayın ve veri klasörünü taşımayın.
 
 ## 1.2.5.7 — finans güvenilirliği ve ortak zemin düzeltmesi
 
@@ -30,7 +43,7 @@ Yedek veya hazırlık başarısızsa uygulama açık kalır. Yardımcı işlem, 
 doğru Windows işleminin kapanmasını bekledikten sonra görünür kurulumu başlatır.
 
 Geliştirme ortamından/portable kopyadan otomatik kurulum yapılmaz; mevcut
-`%LOCALAPPDATA%\Programs\ParaNoya` kullanıcı kurulumu ve kaldırma kaydı gereklidir.
+varsayılan kullanıcı kurulumu veya ParaNoya'nın Windows'taki doğrulanmış kurulum kaydı gereklidir.
 İndirme sırasında kapanış istenirse iş iptal edilir; çalışan Qt iş parçacığı yok edilmez.
 İnternet hatası veya geçersiz imza finans kayıtlarını değiştirmez.
 

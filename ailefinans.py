@@ -321,7 +321,7 @@ class App(QMainWindow):
         migrate_products(self.db)
         self._row_ids={'account':[], 'card':[], 'kmh':[]}
         self.dark = False
-        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.7')
+        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.8')
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')))
         self.resize(1440, 900)
         self.setMinimumSize(920, 600)

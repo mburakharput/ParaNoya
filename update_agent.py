@@ -76,7 +76,9 @@ def run_request(request):
     path,payload=load_request(request)
     local=os.environ.get('LOCALAPPDATA')
     if not local:raise UpdateError('Kullanıcı kurulum klasörü bulunamadı')
-    executable=Path(local)/'Programs'/'ParaNoya'/'ParaNoya.exe'
+    # The GUI's path is untrusted until prepare_handoff verifies the pinned
+    # Windows installation record and the actual running process identity.
+    executable=Path(payload['plan'].get('restart_executable',''))
     expected=prepare_handoff(payload['plan']['installer'],payload['item'],
         explicitly_confirmed=True,executable=executable,frozen=True)
     if payload['plan']!=expected:raise UpdateError('Güncelleme planı değiştirilmiş')

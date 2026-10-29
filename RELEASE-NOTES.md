@@ -1,10 +1,11 @@
-# ParaNoya 1.2.5.7
+# ParaNoya 1.2.5.8
 
-- Kart/KMH ödemeleri ve limit kontrolleri eşzamanlı işlemlere karşı korundu.
-- Gecikmiş faturalar listede tutuluyor; uzun süreli ödeme planlarındaki 240 dönem sınırı kaldırıldı. Gecikmiş/bekleyen durumları gösteriliyor.
-- Belge Merkezi'ne yedek oluşturma ve onaylı geri yükleme eklendi. Yedekte SQLite bütünlüğü, kayıt ilişkileri, sürüm, dosya yolları ve ek belge özetleri kontrol ediliyor.
-- Geri yüklemede eski veri klasörünün tamamı kurtarma kopyası olarak korunuyor. Başarısız veya yarım kalan değiştirmeden kurtarma eklendi.
-- Aynı veri klasöründe ikinci uygulama penceresinin açılması engellendi.
-- Tüm menülerdeki özet kartları ve ayrıntı kutularında renk şeridi oluşturan yazı zeminleri düzeltildi. Açık/koyu tema kontrol edildi.
+- Program Files ve özel klasörlerdeki kayıtlı kurulumları reddeden güncelleme denetimi düzeltildi.
+- Kurulum klasörü ve kullanıcı/tüm kullanıcılar kapsamı Windows kurulum kaydıyla doğrulanıp korunuyor.
+- Yönetici izni gereken güncellemelerde yalnız imzası doğrulanmış kurulum dosyası Windows onayıyla çalıştırılıyor. Yönetici onayı beklenirken dosya değiştirilemiyor veya silinemiyor.
+- Yönetici onayı iptal edilirse mevcut uygulama yeniden açılıyor.
+- 1.2.5.7'nin finans güvenilirliği, geri yükleme ve tüm menülerde zemin düzeltmeleri dahildir.
 
-Geri yüklemeden önce diğer eski ParaNoya kopyalarını kapatın. Özel imza anahtarı veya kişisel veri paketlenmez. Windows Authenticode kod imzası ile güncelleme manifestinin Ed25519 imzası ayrı mekanizmalardır; bu paket Windows kod imzalı değildir.
+Eski güncelleyici Program Files kurulumunu reddediyorsa bu sürüme bir kez elle, mevcut kurulum klasörüne geçin. Programı kaldırmayın; kişisel veri klasörünü taşımayın. Sonraki sürümler uygulama içinden alınabilir.
+
+Özel anahtar veya kişisel veri paketlenmez. Windows Authenticode kod imzası ile güncelleme manifestinin Ed25519 imzası ayrı mekanizmalardır; kurulum EXE'si Windows kod imzalı değildir.
