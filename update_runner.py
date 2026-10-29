@@ -50,8 +50,10 @@ def execute_after_exit(plan, item, *, confirmed=False, app_pid=None, wait_for_ex
     verified = prepare_handoff(installer, item, explicitly_confirmed=True, **preflight)
     if plan != verified:
         raise UpdateError("Kurulum planı doğrulanmış bilgilerle eşleşmiyor")
-    runner = run_installer or _run_installer
+    runner = run_installer or (lambda command:_run_installer(command,elevate=plan.get('requires_elevation') is True,item=item))
     result = runner([str(installer), *args])
+    if result==1223:
+        raise UpdateError('Windows yönetici onayı verilmedi; güncelleme iptal edildi')
     if result != 0:
         raise UpdateError(f"Kurulum başarısız: çıkış kodu {result}")
     if not installed_app.is_file():
@@ -61,8 +63,12 @@ def execute_after_exit(plan, item, *, confirmed=False, app_pid=None, wait_for_ex
     return True
 
 
-def _run_installer(command):
+def _run_installer(command, *, elevate=False, item=None):
     # Installer GUI is visible; no shell expansion or user-provided shell text.
+    if elevate:
+        from windows_elevation import run_elevated
+        if not item:raise UpdateError('İmzalı kurulum bilgisi gerekli')
+        return run_elevated(command,sha256=item['sha256'],size=item['size'])
     return subprocess.run(command, shell=False, check=False).returncode
 
 

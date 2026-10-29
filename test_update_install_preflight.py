@@ -80,6 +80,14 @@ class InstalledUpdatePreflightTests(unittest.TestCase):
         with self.assertRaises(UpdateError):
             self.check(executable=self.base / "ParaNoya.exe")
 
+    def test_accepts_registered_program_files_install_without_moving_data(self):
+        folder=self.base/'Program Files'/'ParaNoya';folder.mkdir(parents=True)
+        exe=folder/'ParaNoya.exe';exe.write_bytes(b'synthetic app')
+        (folder/'unins000.exe').write_bytes(b'synthetic uninstaller')
+        record={'scope':'machine','DisplayName':'ParaNoya','InstallLocation':str(folder),'UninstallString':'"'+str(folder/'unins000.exe')+'"'}
+        with patch('installed_app._registrations',return_value=[record]):
+            self.assertEqual(self.check(executable=exe),folder.resolve())
+
     def test_rejects_nonhex_digest(self):
         with self.assertRaises(UpdateError):
             check_install_preflight(self.installer, {**self.item, "sha256": "z" * 64},

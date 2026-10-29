@@ -1,14 +1,16 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.5.7"
+  #define AppVersion "1.2.5.8"
 #endif
 [Setup]
 AppId={{22874636-8296-42A7-8E61-56C5242C838F}
 AppName=ParaNoya
+UninstallDisplayName=ParaNoya
 AppVersion={#AppVersion}
 AppPublisher=mburakharput
 DefaultDirName={localappdata}\Programs\ParaNoya
 DefaultGroupName=ParaNoya
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=commandline
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\installer-output

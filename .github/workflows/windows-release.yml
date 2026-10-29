@@ -87,6 +87,8 @@ jobs:
           if (!$p.WaitForExit(120000)) { $p.Kill(); throw 'Installed app timed out' }
           if ($p.ExitCode -ne 0 -or !(Test-Path $report)) { throw "Installed app check failed: $($p.ExitCode)" }
           if (!(Get-Content $report -Raw | ConvertFrom-Json).ok) { throw 'Invalid startup report' }
+          python -c "import os; from pathlib import Path; from installed_app import trusted_install_folder, install_options; folder=Path(os.environ['RUNNER_TEMP'])/'ParaNoya-installed'; assert trusted_install_folder(folder/'ParaNoya.exe',os.environ['LOCALAPPDATA'])==folder.resolve(); assert install_options(folder)[0]=='user'"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed registry/path discovery failed' }
           $p = Start-Process -FilePath "$install\unins000.exe" -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw 'Uninstall failed' }
           if (Test-Path "$install\ParaNoya.exe") { throw 'App remains after uninstall' }

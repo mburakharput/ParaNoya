@@ -97,6 +97,7 @@ class UpdateCheckController(QObject):
         if QMessageBox.question(self.parent_window,'Güncellemeyi kur',
                 'Kurulum dosyasının imzası, boyutu ve özeti doğrulandı.\n'
                 'Finans verilerinin yedeği alındıktan sonra ParaNoya kapanacak ve kurulum açılacak.\n'
+                'Gerekirse Windows yönetici onayı istenir.\n'
                 'Şimdi güncellemek istiyor musunuz?',
                 QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)!=QMessageBox.StandardButton.Yes:return
         self.parent_window.setEnabled(False)
