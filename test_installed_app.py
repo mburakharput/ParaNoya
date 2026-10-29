@@ -55,6 +55,10 @@ class InstallationDiscoveryTests(unittest.TestCase):
         with patch('installed_app._registrations',return_value=[self.record,self.record]):
             self.assertEqual(registration(self.folder)['scope'],'machine')
 
+    def test_uninstaller_path_is_compared_after_windows_normalization(self):
+        self.record['UninstallString']='"'+str(self.folder/'..'/'ParaNoya'/'unins000.exe')+'"'
+        self.assertEqual(registration(self.folder)['scope'],'machine')
+
     def test_handoff_preserves_path_and_machine_scope(self):
         setup=self.root/'synthetic.exe';setup.write_bytes(b'never executed')
         with patch('update_handoff.check_install_preflight',return_value=self.folder):

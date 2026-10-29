@@ -29,7 +29,8 @@ def registration(folder):
         if not isinstance(location,str) or not isinstance(uninstall,str) or not location:continue
         location=Path(os.path.expandvars(location)).resolve()
         # UninstallString, unlike QuietUninstallString, is the quoted executable.
-        if location!=folder or uninstall.strip().strip('"').casefold()!=str(folder/'unins000.exe').casefold():continue
+        uninstaller=Path(os.path.expandvars(uninstall.strip().strip('"')))
+        if not uninstaller.is_absolute() or location!=folder or uninstaller.resolve()!=(folder/'unins000.exe').resolve():continue
         matches[record['scope']]=record
     if len(matches)>1:raise UpdateError('Kurulum kapsamı belirsiz; kurulumu elle onarın')
     return next(iter(matches.values()),None)
