@@ -20,6 +20,12 @@ from update_runner import execute_after_exit
 from update_process_exit import wait_for_pid_exit
 
 
+def launcher_pid():
+    # A one-file PyInstaller executable has a waiting bootloader parent. Popen
+    # returns that parent's PID, while this Python code runs in its child.
+    return os.getppid() if getattr(sys, 'frozen', False) else os.getpid()
+
+
 def validate_request_path(request):
     original=Path(request).absolute()
     if any(p.is_symlink() for p in (original,*original.parents)):
@@ -79,7 +85,7 @@ def run_request(request):
         if (path.parent/'update-cancelled').exists():raise UpdateError('Güncelleme iptal edildi')
         partial=path.parent/'update-ready.partial'
         with partial.open('x',encoding='utf-8') as output:
-            json.dump({'helper_pid':os.getpid(),'app_pid':payload['app_pid']},output)
+            json.dump({'helper_pid':launcher_pid(),'app_pid':payload['app_pid']},output)
         os.replace(partial,path.parent/'update-ready.json')
     def wait():
         nonlocal exited
@@ -100,12 +106,16 @@ def main(argv=None):
     parser=argparse.ArgumentParser()
     parser.add_argument('--request')
     parser.add_argument('--self-test',action='store_true')
+    parser.add_argument('--self-test-report')
     args=parser.parse_args(argv)
     if args.self_test:
         from central_updates import load_config
         load_config()
         from nacl.signing import VerifyKey
         VerifyKey(bytes.fromhex(load_config()['signing_public_key']))
+        if args.self_test_report:
+            with Path(args.self_test_report).open('x',encoding='utf-8') as output:
+                json.dump({'launcher_pid':launcher_pid(),'ok':True},output)
         return 0
     if not args.request:parser.error('--request gerekli')
     try:

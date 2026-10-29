@@ -24,6 +24,15 @@ def run():
     from record_manager import migrate_record_state
     from recurring_core import migrate_recurring
     from bank_logo_manager import logo_dir
+    from central_updates import load_config
+    from nacl.signing import VerifyKey
+    from nacl.exceptions import BadSignatureError
+    try:
+        VerifyKey(bytes.fromhex(load_config()['signing_public_key'])).verify(b'smoke',bytes(64))
+    except BadSignatureError:
+        pass
+    else:
+        raise AssertionError('Invalid signature accepted')
     migrate()
     with open_db() as db:
         migrate_kmh(db)

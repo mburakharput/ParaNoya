@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock,patch
 from central_updates import UpdateError
-from update_agent import write_request,load_request,run_request,main
+from update_agent import write_request,load_request,run_request,main,launcher_pid
 from update_process_exit import wait_for_pid_exit
 
 
@@ -58,3 +58,15 @@ class UpdateAgentTests(unittest.TestCase):
     def test_helper_selftest_has_no_installer_side_effect(self):
         with patch('update_agent.run_request') as run:
             self.assertEqual(main(['--self-test']),0);run.assert_not_called()
+    def test_frozen_helper_reports_bootloader_pid(self):
+        with patch('update_agent.sys.frozen',True,create=True),patch('update_agent.os.getppid',return_value=321),patch('update_agent.os.getpid',return_value=654):
+            self.assertEqual(launcher_pid(),321)
+    def test_source_helper_reports_own_pid(self):
+        with patch('update_agent.sys.frozen',False,create=True),patch('update_agent.os.getpid',return_value=654):
+            self.assertEqual(launcher_pid(),654)
+    def test_selftest_report_identifies_launched_process(self):
+        report=self.root/'selftest.json'
+        with patch('update_agent.launcher_pid',return_value=321),patch('update_agent.run_request') as run:
+            self.assertEqual(main(['--self-test','--self-test-report',str(report)]),0)
+            self.assertEqual(json.loads(report.read_text()),{'launcher_pid':321,'ok':True})
+            run.assert_not_called()

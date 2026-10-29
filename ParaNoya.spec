@@ -5,7 +5,7 @@ a = Analysis([str(root / 'ailefinans.py')], pathex=[str(root)],
                          (str(root / 'assets' / 'chevron-down.svg'), 'assets'),
                          (str(root / 'assets' / 'banks' / 'ziraatdinamik.png'), 'assets/banks'),
                          (str(root / 'release-config.json'), '.')],
-    hiddenimports=['PySide6.QtSvg', 'PySide6.QtSvgWidgets', 'packaging_smoke', 'pymupdf', 'openpyxl'],
+    hiddenimports=['PySide6.QtSvg', 'PySide6.QtSvgWidgets', 'packaging_smoke', 'pymupdf', 'openpyxl', '_cffi_backend'],
     hookspath=[], hooksconfig={}, runtime_hooks=[],
     excludes=['PyQt5', 'PyQt6', 'PySide2', 'tkinter'], noarchive=False)
 pyz = PYZ(a.pure)

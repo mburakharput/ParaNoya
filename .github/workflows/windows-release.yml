@@ -51,10 +51,12 @@ jobs:
         run: |
           $helper = Join-Path $PWD 'dist\ParaNoya\ParaNoyaUpdater.exe'
           if (!(Test-Path $helper)) { throw 'Update helper missing' }
-          $p = Start-Process -FilePath $helper -ArgumentList '--self-test' -WindowStyle Hidden -PassThru -RedirectStandardOutput helper-out.txt -RedirectStandardError helper-error.txt
+          $p = Start-Process -FilePath $helper -ArgumentList @('--self-test', '--self-test-report', 'helper-report.json') -WindowStyle Hidden -PassThru -RedirectStandardOutput helper-out.txt -RedirectStandardError helper-error.txt
           if (!$p.WaitForExit(120000)) { $p.Kill(); throw 'Update helper timed out' }
           Get-Content helper-out.txt, helper-error.txt
           if ($p.ExitCode -ne 0) { throw 'Update helper self test failed' }
+          $report = Get-Content helper-report.json -Raw | ConvertFrom-Json
+          if (!$report.ok -or $report.launcher_pid -ne $p.Id) { throw 'Update helper process identity failed' }
       - name: Compile installer
         shell: pwsh
         run: |
