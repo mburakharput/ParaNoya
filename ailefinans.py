@@ -173,7 +173,7 @@ def list_bank_names():
     from card_catalog import SEED
     additional = {'Türkiye Cumhuriyeti Ziraat Bankası', 'Türkiye Vakıflar Bankası',
                   'Türkiye Halk Bankası', 'Alternatif Bank', 'Aktif Bank',
-                  'Turkish Bank', 'ICBC Turkey', 'Türkiye Emlak Katılım',
+                  'ICBC Turkey', 'Türkiye Emlak Katılım',
                   'Vakıf Katılım', 'Dünya Katılım Bankası'}
     return sorted(set(SEED) | additional, key=str.casefold)
 
@@ -320,7 +320,7 @@ class App(QMainWindow):
         migrate_products(self.db)
         self._row_ids={'account':[], 'card':[], 'kmh':[]}
         self.dark = False
-        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.5')
+        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.6')
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')))
         self.resize(1440, 900)
         self.setMinimumSize(920, 600)
@@ -397,7 +397,13 @@ class App(QMainWindow):
         self.logo_status.setWordWrap(True)
         self.logo_status.hide()
         left.addWidget(self.logo_status)
-        footer=QLabel('🦉  ParaNoya');footer.setObjectName('sidebarFooter');left.addWidget(footer)
+        from in_app_updates import UpdateCheckController
+        self.update_button=QPushButton('↻  Güncellemeleri denetle')
+        self.update_button.setObjectName('sidebarUpdate')
+        self.update_button.setToolTip('İmzalı sürümü denetle; kurulumdan önce onayınız istenir')
+        self.update_controller=UpdateCheckController(self,self.update_button)
+        self.update_button.clicked.connect(self.update_controller.start)
+        left.addWidget(self.update_button)
         theme_btn = QPushButton('☼ / ☾  Temayı değiştir')
         theme_btn.clicked.connect(self.toggle_theme)
         left.addWidget(theme_btn)
@@ -1817,6 +1823,10 @@ class App(QMainWindow):
             b.setStyleSheet('background:#008da5;color:#ffffff;font-weight:700;' if page_index==self.stack.currentIndex() else 'background:transparent;color:#f0f9ff;border:0;')
 
     def closeEvent(self, event):
+        controller=getattr(self,'update_controller',None)
+        if controller is not None and controller.request_close():
+            event.ignore()
+            return
         worker=getattr(self, '_logo_worker', None)
         if worker is not None and worker.isRunning():
             worker.requestInterruption()

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish current installer version after checks
+        description: Prepare central release artifacts after checks (sign and publish locally)
         type: boolean
         default: false
       reuse_run_id:
@@ -44,6 +44,19 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !(Test-Path "$env:RUNNER_TEMP\smoke-source.json")) { throw "Source startup check failed" }
       - name: Build application
         run: python -m PyInstaller --noconfirm --clean ParaNoya.spec
+      - name: Verify standalone update helper
+        # Build and run the isolated helper before distributing it.
+        # It validates its embedded config without network or finance access.
+        shell: pwsh
+        run: |
+          $helper = Join-Path $PWD 'dist\ParaNoya\ParaNoyaUpdater.exe'
+          if (!(Test-Path $helper)) { throw 'Update helper missing' }
+          $p = Start-Process -FilePath $helper -ArgumentList @('--self-test', '--self-test-report', 'helper-report.json') -WindowStyle Hidden -PassThru -RedirectStandardOutput helper-out.txt -RedirectStandardError helper-error.txt
+          if (!$p.WaitForExit(120000)) { $p.Kill(); throw 'Update helper timed out' }
+          Get-Content helper-out.txt, helper-error.txt
+          if ($p.ExitCode -ne 0) { throw 'Update helper self test failed' }
+          $report = Get-Content helper-report.json -Raw | ConvertFrom-Json
+          if (!$report.ok -or $report.launcher_pid -ne $p.Id) { throw 'Update helper process identity failed' }
       - name: Compile installer
         shell: pwsh
         run: |
@@ -80,6 +93,7 @@ jobs:
           Copy-Item $report installer-output\verification.json
           $file = Get-Item $setup
           "$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLower())  $($file.Name)" | Set-Content installer-output\SHA256SUMS.txt -Encoding ascii
+          Write-Host "VERIFIED_INSTALLER_SHA256=$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLower())"
       - uses: actions/upload-artifact@v4
         with:
           name: ParaNoya-Windows-x64
@@ -121,7 +135,7 @@ jobs:
           path: release-assets
           github-token: ${{ github.token }}
           run-id: ${{ inputs.reuse_run_id || github.run_id }}
-      - name: Publish verified installer
+      - name: Prepare verified central release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -131,13 +145,18 @@ jobs:
         run: |
           version=$(sed -nE 's/^[[:space:]]*#define AppVersion "([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?)".*/\1/p' installer/ParaNoya.iss | head -n 1)
           test -n "$version" || { echo "Installer version missing"; exit 1; }
-          tag="v$version"
+          tag="ParaNoya-v$version"
           if [[ "$REF" == refs/tags/* ]]; then
-            test "${REF#refs/tags/}" = "$tag" || { echo "Tag/version mismatch"; exit 1; }
+            test "${REF#refs/tags/}" = "v$version" || { echo "Tag/version mismatch"; exit 1; }
           fi
           test -f "release-assets/ParaNoya-$version-Windows-x64-Setup.exe"
           (cd release-assets && sha256sum --check SHA256SUMS.txt)
           jq -e '.ok == true and .database == "temporary"' release-assets/verification.json >/dev/null
           jq -n --arg repository "$GH_REPO" --arg commit "$COMMIT" --arg run "$ARTIFACT_RUN" --arg version "$version" '{repository:$repository,source_commit:$commit,build_run_id:$run,version:$version}' > release-assets/build-provenance.json
-          if gh release view "$tag" >/dev/null 2>&1; then echo "Release $tag exists; refusing overwrite"; exit 1; fi
-          gh release create "$tag" release-assets/* --target "$COMMIT" --title "ParaNoya $tag" --notes "Bordrodan onaylı gelir, ödenmiş faturadan gider ve ekstre alışverişinden kart borcu aktarımı eklendi. Mükerrer kayıt ve profil kontrolleri, finansal veri korumaları, ay sonu vade düzeltmeleri, canlı pano, otomatik banka logoları ve dairesel baykuş görünümü bu sürümdedir. 74 test ile Windows derleme, kurulum, açılış, yeniden kurulum ve kaldırma kontrolleri geçti. Kişisel finans verileri pakete dahil değildir. Kurulum dosyası kod imzalı değildir; otomatik güncelleme ve banka bağlantısı etkin değildir."
+          echo "Verified artifacts prepared for mburakharput/uygulama-guncellemeleri / $tag. Sign and publish locally with release_tools/Publish-ParaNoya.ps1."
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ParaNoya-Central-Release
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 30

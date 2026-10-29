@@ -15,7 +15,7 @@ class LogoTests(unittest.TestCase):
                 self.assertEqual(fetch_logos(d,cancelled=lambda:True),(0,0,[]))
     def test_missing_uses_fallback(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertIsNone(logo_path('Ziraat Dinamik', d))
+            self.assertEqual(logo_path('Ziraat Dinamik', d).name,'ziraatdinamik.png')
             self.assertIsNone(logo_path('Garanti BBVA', d))
             (Path(d)/'garanti.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
             self.assertEqual(logo_path('Garanti BBVA', d).name, 'garanti.svg')

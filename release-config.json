@@ -1,0 +1,9 @@
+{
+  "version": "1.2.5.6",
+  "repository": "mburakharput/uygulama-guncellemeleri",
+  "asset_prefix": "ParaNoya",
+  "tag_prefix": "ParaNoya-v",
+  "install_scope": "user",
+  "updates_enabled": true,
+  "signing_public_key": "4585f8d6c538c825e7972b103d4bb26969d5c25c59030bb4d387e72f89a3a90e"
+}
