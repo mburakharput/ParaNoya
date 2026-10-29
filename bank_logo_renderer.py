@@ -53,6 +53,18 @@ def qt_svg_bytes(path):
 def bank_icon(path, width=96, height=24):
     if not path:
         return QIcon()
+    if path.suffix.lower()=='.png':
+        source=QPixmap(str(path))
+        if source.isNull():return QIcon()
+        # Display the supplied original unchanged. Crop only the empty canvas
+        # during painting, preserving every original logo pixel and its ratio.
+        crop=QRectF(94,149,460,62) if path.stem=='ziraatdinamik' and source.size().width()==645 and source.size().height()==360 else QRectF(source.rect())
+        scale=min((width-8)/crop.width(),(height-4)/crop.height())
+        w,h=crop.width()*scale,crop.height()*scale
+        canvas=QPixmap(width*3,height*3);canvas.setDevicePixelRatio(3);canvas.fill(Qt.GlobalColor.transparent)
+        painter=QPainter(canvas);painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(QRectF((width-w)/2,(height-h)/2,w,h),source,crop);painter.end()
+        return QIcon(canvas)
     try:
         renderer = QSvgRenderer(QByteArray(qt_svg_bytes(path)))
     except (OSError, ET.ParseError, ValueError):

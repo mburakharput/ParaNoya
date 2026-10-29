@@ -1,6 +1,36 @@
-# ParaNoya v1.2.5.3
+# ParaNoya v1.2.5.6
 
-Windows x64 kurulum dosyası: https://github.com/mburakharput/ParaNoya/releases/latest
+## 1.2.5.6 — güvenli uygulama içi güncelleme
+
+Kurulum sihirbazı Türkçedir. İlk geçişte yeni kurulum bir kez elle yapılır;
+sonraki sürümler **Güncellemeleri denetle** üzerinden indirilip açık onayla kurulabilir.
+İmzalı güncellemelerin tek merkezi `mburakharput/uygulama-guncellemeleri`,
+etiket biçimi `ParaNoya-vSÜRÜM` şeklindedir. Başka uygulamaların yayınları yok sayılır.
+Yayıncı Ed25519 imzası, sürüm, dosya adı, boyut ve SHA-256 yeniden denetlenir;
+imzasız veya eski kurulumlar çalıştırılmaz. Kurulumdan önce SQLite ve ürün ekleri
+`%LOCALAPPDATA%\ParaNoya\UpdateBackups` altında doğrulanmış ZIP olarak yedeklenir.
+Yedek veya hazırlık başarısızsa uygulama açık kalır. Yardımcı işlem, ParaNoya'nın
+doğru Windows işleminin kapanmasını bekledikten sonra görünür kurulumu başlatır.
+
+Geliştirme ortamından/portable kopyadan otomatik kurulum yapılmaz; mevcut
+`%LOCALAPPDATA%\Programs\ParaNoya` kullanıcı kurulumu ve kaldırma kaydı gereklidir.
+İndirme sırasında kapanış istenirse iş iptal edilir; çalışan Qt iş parçacığı yok edilmez.
+İnternet hatası veya geçersiz imza finans kayıtlarını değiştirmez.
+
+### Yayıncı için yerel imzalama ve merkezi yayın
+
+Özel anahtar yalnız yayıncının bilgisayarında kalır; GitHub'a yüklenmez ve CI
+tarafından okunmaz. `release_tools/Publish-ParaNoya.ps1`, kullanıcı tarafından
+çalıştırıldığında başarılı CI paketini indirir, kaynağını ve beklenen özetini
+kontrol eder, masaüstündeki anahtarı seçtirir ve yerel imzalama yapar. Ardından
+EXE, manifest, imza, SHA256SUMS, doğrulama raporu ve kaynak bilgilerini merkezi
+depoya taslak olarak yükler. Tüm dosya özetleri eşleşince yayın açılır.
+GitHub oturumu Git Credential Manager üzerinden alınır; erişim bilgileri yazdırılmaz.
+Çalıştırma komutundaki BuildRunId, SourceCommit ve InstallerSha256 değerleri ilgili
+başarılı CI koşusundan alınmalıdır. Bu betiği asistan özel anahtara karşı çalıştırmaz.
+
+
+Windows x64 merkezi yayınları: https://github.com/mburakharput/uygulama-guncellemeleri/releases
 
 Bu sürüm: daha dar banka listesi ve 32px satırlar; logo ile banka adı arasında sabit boşluk; Enpara symbol/use ve Şekerbank clipPath çizim düzeltmesi; hesap, kart, KMH, ödeme ve transfer seçimlerinde ortak logo çizimi; tüm seçim kutularında ve tarih açılır alanlarında uyumlu ok. ParaNoya baykuşu uygulama ve Setup EXE ikonuna gömülüdür. Banka logolarının indirme davranışı korunur. Kişisel veri paketlenmez.
 

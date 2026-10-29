@@ -27,13 +27,16 @@ LOGO_IDS = {
  'Citibank':'citibank', 'Hayat Finans':'hayatfinans',
  'Golden Global Yatırım Bankası':'goldenglobal',
  'Tera Bank':'terabank', 'Arap Türk Bankası':'atbank',
- 'Ziraat Dinamik':None, 'Turkish Bank':None,
+ 'Ziraat Dinamik':None,
 }
+BUNDLED_LOGOS={'Ziraat Dinamik':Path(__file__).parent/'assets'/'banks'/'ziraatdinamik.png'}
 
 def logo_dir(root=None):
     return (Path(root) if root is not None else DB_DIR / 'bank_logos')
 
 def logo_path(bank, root=None):
+    bundled=BUNDLED_LOGOS.get(bank)
+    if bundled is not None and bundled.is_file():return bundled
     slug = LOGO_IDS.get(bank)
     if not slug:
         return None
