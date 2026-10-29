@@ -22,6 +22,11 @@ class InstallationDiscoveryTests(unittest.TestCase):
         self.assertEqual(trusted_install_folder(self.exe,self.root/'Local'),self.folder.resolve())
         self.assertEqual(install_options(self.folder),('machine',True))
 
+    def test_previous_inno_display_name_with_version_is_accepted(self):
+        for display in ('ParaNoya 1.2.5.6','ParaNoya version 1.2.5.7','ParaNoya sürüm 1.2.5.6'):
+            with self.subTest(display=display),patch('installed_app._registrations',return_value=[{**self.record,'DisplayName':display}]):
+                self.assertEqual(trusted_install_folder(self.exe,self.root/'Local'),self.folder.resolve())
+
     def test_custom_per_user_folder_keeps_scope(self):
         self.record['scope']='user'
         with patch.dict(os.environ,{'ProgramFiles':str(self.root/'Program Files')}):

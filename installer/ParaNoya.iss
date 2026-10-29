@@ -4,6 +4,7 @@
 [Setup]
 AppId={{22874636-8296-42A7-8E61-56C5242C838F}
 AppName=ParaNoya
+UninstallDisplayName=ParaNoya
 AppVersion={#AppVersion}
 AppPublisher=mburakharput
 DefaultDirName={localappdata}\Programs\ParaNoya

@@ -1,5 +1,6 @@
 """Discover only this app's pinned Inno Setup registration; never scan user data."""
 import os
+import re
 from pathlib import Path
 from central_updates import UpdateError
 
@@ -22,7 +23,8 @@ def _registrations():
 def registration(folder):
     folder=Path(folder).resolve();matches={}
     for record in _registrations():
-        if record.get('DisplayName')!='ParaNoya':continue
+        display=record.get('DisplayName')
+        if not isinstance(display,str) or not re.fullmatch(r'ParaNoya(?: (?:version |sürüm )?[0-9]+(?:\.[0-9]+){2,3})?',display,re.IGNORECASE):continue
         location=record.get('InstallLocation');uninstall=record.get('UninstallString')
         if not isinstance(location,str) or not isinstance(uninstall,str) or not location:continue
         location=Path(os.path.expandvars(location)).resolve()
