@@ -15,10 +15,10 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='ParaNoya',
 # The helper is one-file and copied to the verified temporary directory before
 # launch, so the installer can replace every installed file without locking it.
 u = Analysis([str(root / 'update_agent.py')], pathex=[str(root)], binaries=[],
-    datas=[(str(root / 'release-config.json'), '.')], hiddenimports=['nacl.signing'],
+    datas=[(str(root / 'release-config.json'), '.')], hiddenimports=['nacl.signing', '_cffi_backend'],
     hookspath=[], hooksconfig={}, runtime_hooks=[],
     excludes=['PySide6','PyQt5','PyQt6','PySide2','tkinter'], noarchive=False)
 upyz = PYZ(u.pure)
 updater = EXE(upyz, u.scripts, u.binaries, u.datas, [], name='ParaNoyaUpdater',
-    debug=False, strip=False, upx=False, console=False)
+    debug=False, strip=False, upx=False, console=True)
 coll = COLLECT(exe, updater, a.binaries, a.datas, strip=False, upx=False, name='ParaNoya')
