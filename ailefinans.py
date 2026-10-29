@@ -6,7 +6,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from PySide6.QtCore import Qt, QSize, QEventLoop, QRectF, QDate, QUrl, QEvent
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen, QDesktopServices
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QPainterPath, QColor, QFont, QPen, QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QComboBox, QStackedWidget, QFormLayout, QLineEdit, QMessageBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QDialog, QDialogButtonBox, QDoubleSpinBox,
@@ -18,7 +18,7 @@ from record_manager import migrate_record_state, get_state, change_state, depend
 from card_catalog import load_catalog, search_catalog
 from bank_logo_manager import logo_path, fetch_logos
 from bank_logo_renderer import bank_icon, menu_icon
-from document_center import TYPES, migrate_documents, stage, list_docs, approve_salary
+from document_center import TYPES, migrate_documents, stage, list_docs, approve_salary, approve_document_entry
 from kmh_core import migrate_kmh, closing_due, set_overdraft, overdraft, use_overdraft, add_installment_loan, monthly_calendar, pay_installment
 from v04_core import month_add, cards,create_card,purchase,pay_card,upcoming,shared_history,edit_shared_split
 from finance_core import (DB_DIR, DB_PATH, money, open_db, migrate, get_profiles, add_account,
@@ -27,15 +27,38 @@ from finance_core import (DB_DIR, DB_PATH, money, open_db, migrate, get_profiles
 
 from PySide6.QtCore import QThread, Signal
 
+def circular_mascot(path, size=60):
+    """Crop the actual raster to a circle, not just its surrounding label."""
+    density=3
+    canvas=QPixmap(size*density,size*density)
+    canvas.setDevicePixelRatio(density)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter=QPainter(canvas)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QColor('#ffffff'))
+    painter.drawEllipse(QRectF(0,0,size,size))
+    clip=QPainterPath()
+    clip.addEllipse(QRectF(3,3,size-6,size-6))
+    painter.setClipPath(clip)
+    source=QPixmap(str(path)).scaled((size-6)*density,(size-6)*density,Qt.AspectRatioMode.KeepAspectRatioByExpanding,Qt.TransformationMode.SmoothTransformation)
+    if not source.isNull():
+        width=source.width()/density;height=source.height()/density
+        painter.drawPixmap(QRectF((size-width)/2,(size-height)/2,width,height),source,QRectF(source.rect()))
+    painter.end()
+    return canvas
+
+
 class LogoDownloadWorker(QThread):
     finished_result = Signal(int, int, object)
     def run(self):
-        n,p,errors = fetch_logos(timeout=5)
+        n,p,errors = fetch_logos(timeout=5, cancelled=self.isInterruptionRequested)
         self.finished_result.emit(n,p,errors)
 
 class FinanceBars(QWidget):
     """Real data-driven custom donut or trend painter; no chart screenshots."""
-    PALETTE=['#26bea9','#3989f5','#ffae5a','#a17cf5','#ee6b83','#58bce5']
+    PALETTE=['#348cff','#15cfa0','#ffac55','#ac68eb','#f45b83','#50bfe8']
     def __init__(self,title,kind='donut'):
         super().__init__()
         self.heading=title;self.kind=kind;self.values=[]
@@ -46,9 +69,10 @@ class FinanceBars(QWidget):
     def paintEvent(self,event):
         p=QPainter(self);p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r=self.rect().adjusted(1,1,-2,-2)
-        p.setPen(QPen(QColor('#e1eaf3'),1));p.setBrush(QColor('#ffffff'))
+        dark=self.property('darkTheme') is True
+        p.setPen(QPen(QColor('#284b66' if dark else '#dceaf6'),1));p.setBrush(QColor('#122e49' if dark else '#f8fcff'))
         p.drawRoundedRect(r,16,16)
-        p.setPen(QColor('#142d48'));font=p.font();font.setPointSize(11);font.setBold(True);p.setFont(font)
+        p.setPen(QColor('#edf8ff' if dark else '#142d48'));font=p.font();font.setPointSize(11);font.setBold(True);p.setFont(font)
         p.drawText(18,31,self.heading)
         items=self.values[:6]
         if not items or all(sum(max(0,float(x)) for x in item[1:])<=0 for item in items):
@@ -72,14 +96,14 @@ class FinanceBars(QWidget):
             v=max(0,float(item[1]));span=round(-360*16*v/total)
             pen.setColor(QColor(self.PALETTE[i%len(self.PALETTE)]));p.setPen(pen);p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawArc(inner,start,span);start+=span
-        p.setPen(QColor('#183651'));font=p.font();font.setPointSize(10);font.setBold(True);p.setFont(font)
+        p.setPen(QColor('#edf8ff' if self.property('darkTheme') else '#183651'));font=p.font();font.setPointSize(10);font.setBold(True);p.setFont(font)
         p.drawText(arc,Qt.AlignmentFlag.AlignCenter,f'{total/100:,.0f} ₺')
         font.setPointSize(9);font.setBold(False);p.setFont(font)
         lx=int(diameter+36);available=max(55,self.width()-lx-13)
         for i,item in enumerate(items[:6]):
             yy=55+i*25
             p.setPen(Qt.PenStyle.NoPen);p.setBrush(QColor(self.PALETTE[i%len(self.PALETTE)]));p.drawEllipse(lx,yy,9,9)
-            p.setPen(QColor('#435a6b'))
+            p.setPen(QColor('#c4dcec' if self.property('darkTheme') else '#435a6b'))
             label=str(item[0]);label=label[:max(4,available//9)]
             p.drawText(lx+16,yy+9,label)
     def _trend(self,p,items):
@@ -215,7 +239,7 @@ class AddAccountDialog(InlineDialog):
         self.kind.addItem('Banka hesabı', 'bank')
         self.kind.addItem('Nakit / cüzdan', 'cash')
         self.bank = BankSelectionCombo()
-        
+
         for bank_name in list_bank_names():
             self.bank.addItem(self._logo_icon(bank_name), bank_name)
 
@@ -296,7 +320,7 @@ class App(QMainWindow):
         migrate_products(self.db)
         self._row_ids={'account':[], 'card':[], 'kmh':[]}
         self.dark = False
-        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.3')
+        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.5')
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')))
         self.resize(1440, 900)
         self.setMinimumSize(920, 600)
@@ -313,7 +337,9 @@ class App(QMainWindow):
         brand_panel=QWidget();brand_panel.setObjectName('brandPanel')
         brand_row=QHBoxLayout(brand_panel);brand_row.setContentsMargins(8,9,8,9);brand_row.setSpacing(8)
         brand_panel.setMinimumHeight(80);brand_panel.setMaximumHeight(94)
-        mascot=QLabel();mascot.setPixmap(QPixmap(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')).scaled(54,54,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation))
+        mascot=QLabel();mascot.setObjectName('mascotAvatar');mascot.setFixedSize(60,60)
+        mascot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        mascot.setPixmap(circular_mascot(Path(__file__).parent/'assets'/'paranoya_mascot.png'))
         brand_row.addWidget(mascot)
         brand_text=QVBoxLayout();brand_text.setSpacing(4)
         brand=QLabel('<span style="color:#ffffff">Para</span><span style="color:#2ad6ca">Noya</span>');brand.setTextFormat(Qt.TextFormat.RichText);brand.setObjectName('brand')
@@ -386,22 +412,16 @@ class App(QMainWindow):
         topbar.addWidget(self.search_box,2)
         self.profile_badge=QLabel('◉  Kişisel / Aile');self.profile_badge.setObjectName('profileBadge')
         topbar.addStretch();topbar.addWidget(self.profile_badge)
-        settings_bar=QHBoxLayout()
-        settings_bar.addStretch()
-        self.logo_settings_button=QPushButton('⚙  Ayarlar · Banka Logolarını Güncelle')
-        self.logo_settings_button.setToolTip('Eksik banka logolarını denetle ve indir')
-        self.logo_settings_button.clicked.connect(lambda: self.download_bank_logos(manual=True))
-        settings_bar.addWidget(self.logo_settings_button)
-        content.addLayout(settings_bar)
         content.addLayout(topbar)
         content.addWidget(self.heading)
         self.notice = QLabel('Belgeler onayınızla kaydedilir  •  Profil seçimi güvenli oturum değildir.')
         self.notice.setWordWrap(True)
         content.addWidget(self.notice)
         self.dashboard=QWidget()
+        self.dashboard.setMinimumSize(1100,650)
         dash=QVBoxLayout(self.dashboard);dash.setSpacing(14)
         overview=QGridLayout();overview.setSpacing(10)
-        self.balance_value=self.make_card(overview,0,'◈  Toplam Varlık')
+        self.balance_value=self.make_card(overview,0,'◈  Hesap Bakiyesi')
         self.debt_value=self.make_card(overview,1,'▣  Toplam Kart Borcu')
         self.income_value=self.make_card(overview,2,'↗  Toplam Gelir')
         self.expense_value=self.make_card(overview,3,'↘  Toplam Gider')
@@ -411,7 +431,7 @@ class App(QMainWindow):
         from PySide6.QtWidgets import QSizePolicy
         self.category_chart=FinanceBars('Giderlerin Kategori Dağılımı')
         self.trend_chart=FinanceBars('Aylık Gelir - Gider Trendi','trend')
-        self.asset_chart=FinanceBars('Varlık Dağılımı')
+        self.asset_chart=FinanceBars('Pozitif Hesap Bakiyeleri')
         middle.addWidget(self.category_chart,2);middle.addWidget(self.trend_chart,2);middle.addWidget(self.asset_chart,2)
         dash.addLayout(middle,2)
         bottom=QHBoxLayout();bottom.setSpacing(12)
@@ -421,12 +441,16 @@ class App(QMainWindow):
         due_box=QGroupBox('Yaklaşan Ödemeler');due_layout=QVBoxLayout(due_box)
         self.dashboard_due=self.make_table(['Vade','Kart / Hesap','Tutar'])
         due_layout.addWidget(self.dashboard_due);bottom.addWidget(due_box,2)
-        quick_box=QGroupBox('Hızlı İşlemler');quick=QVBoxLayout(quick_box)
+        quick_box=QGroupBox('Hızlı İşlemler');quick_box.setObjectName('quickActions');quick=QVBoxLayout(quick_box)
         for lbl,cb in [('＋  İşlem Ekle',self.create_transaction),('⇄  Transfer',self.create_transfer),('▧  Ekstre Yükle',self.import_document),('▣  Kart Ekle',self.new_card)]:
             b=QPushButton(lbl);b.clicked.connect(cb);quick.addWidget(b)
         quick.addStretch();bottom.addWidget(quick_box,1)
         dash.addLayout(bottom,3)
-        self.stack.addWidget(self.dashboard)
+        dashboard_scroll=QScrollArea()
+        dashboard_scroll.setWidgetResizable(True)
+        dashboard_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        dashboard_scroll.setWidget(self.dashboard)
+        self.stack.addWidget(dashboard_scroll)
         accounts_page = QWidget()
         ac_layout = QVBoxLayout(accounts_page)
         new_acc = QPushButton('+ Yeni hesap')
@@ -583,7 +607,7 @@ class App(QMainWindow):
         self.stack.addWidget(calpage)
         documents_page=QWidget()
         dv=QVBoxLayout(documents_page)
-        dv.addWidget(QLabel('Belgeler yerel okunur. Kredi kartı / KMH belgeleri yalnızca incelemeye alınır.'))
+        dv.addWidget(QLabel('Bordro, fatura ve ekstre yerel okunur; bilgileri kontrol edip onaylayınca finans kaydı oluşur.'))
         upload=QPushButton('+ Belge yükle (PDF, CSV, Excel, TXT)')
         upload.clicked.connect(self.import_document)
         dv.addWidget(upload,alignment=Qt.AlignmentFlag.AlignLeft)
@@ -595,8 +619,8 @@ class App(QMainWindow):
         self.doc_preview=self.make_table(['Satır','Tarih','Açıklama / Taksit','Tutar','Durum'])
         dv.addWidget(self.doc_preview)
         dv.addWidget(QLabel('Önizleme finans kaydı oluşturmaz. Tüm satırlar bankanın belgesiyle karşılaştırılmalıdır.'))
-        salary=QPushButton('Seçilen bordroyu gelir olarak onayla')
-        salary.clicked.connect(self.post_salary_document)
+        salary=QPushButton('Seçili belgeden gelir / gider oluştur')
+        salary.clicked.connect(self.post_document_entry)
         dv.addWidget(salary,alignment=Qt.AlignmentFlag.AlignLeft)
         self.stack.addWidget(documents_page)
         # Düzenli fatura ve abonelik modülü: tüm seçimler içerik alanındadır.
@@ -651,11 +675,22 @@ class App(QMainWindow):
             self.tx_table.setRowHidden(r,not hit)
 
     def make_card(self, grid, col, title):
-        box = QGroupBox(title)
+        box = QFrame()
+        box.setObjectName('overviewCard')
+        box.setProperty('tone', ['teal', 'rose', 'green', 'orange', 'blue'][col])
         layout = QVBoxLayout(box)
+        layout.setContentsMargins(14, 14, 14, 14)
+        caption = QLabel(title)
+        caption.setObjectName('overviewCaption')
+        caption.setToolTip(title)
+        layout.addWidget(caption)
         value = QLabel('0,00 ₺')
         value.setObjectName('stat')
         layout.addWidget(value)
+        footnote = QLabel('Seçili çalışma alanı · tüm kayıtlar')
+        footnote.setObjectName('overviewNote')
+        footnote.setWordWrap(True)
+        layout.addWidget(footnote)
         grid.addWidget(box, 0, col)
         return value
 
@@ -665,6 +700,10 @@ class App(QMainWindow):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.verticalHeader().hide()
+        table.verticalHeader().setDefaultSectionSize(36)
+        table.setAlternatingRowColors(True)
+        table.setShowGrid(False)
         return table
 
     def _add_actions(self,layout,table,kind):
@@ -957,6 +996,9 @@ class App(QMainWindow):
         for r, row in enumerate(rows):
             for c, value in enumerate(row):
                 item = QTableWidgetItem(str(value))
+                item.setToolTip(str(value))
+                if str(value).endswith('₺') and str(value).startswith(('-', '+')):
+                    item.setForeground(QColor('#f0607c' if str(value).startswith('-') else '#009e83'))
                 heading = table.horizontalHeaderItem(c).text()
                 if heading in {'Hesap', 'Kart', 'Banka hesabı', 'Gönderen', 'Alıcı', 'Ödeyen hesap'}:
                     bank = self._bank_for_text(str(value))
@@ -986,10 +1028,13 @@ class App(QMainWindow):
         self.acc_positive_balance.setText(money(sum(max(0,a[3]) for a in accs)))
         self._selection_changed('account')
         self.update_account_details()
-        rows = self.db.execute('''SELECT t.recorded_at,t.kind,a.name,t.category,t.description,t.amount_cents
+        rows = self.db.execute('''SELECT * FROM (SELECT t.recorded_at AS happened,t.kind,a.name,t.category,t.description,t.amount_cents
             FROM transactions t JOIN accounts a ON a.id=t.account_id
-            WHERE t.profile_id=? ORDER BY t.id DESC''', (pid,)).fetchall()
-        shown = [(when, 'Gelir' if kind == 'income' else 'Gider', acct, cat, note,
+            WHERE t.profile_id=?
+            UNION ALL SELECT p.purchase_date,'card_expense',c.name,p.category,p.description,p.total_cents
+            FROM card_purchases p JOIN credit_cards c ON c.id=p.card_id WHERE c.profile_id=?)
+            ORDER BY happened DESC''', (pid,pid)).fetchall()
+        shown = [(when, 'Gelir' if kind == 'income' else ('Kart gideri' if kind=='card_expense' else 'Gider'), acct, cat, note,
                   ('+' if kind == 'income' else '-') + money(amt))
                  for when, kind, acct, cat, note, amt in rows]
         self.fill_table(self.tx_table, shown)
@@ -1126,17 +1171,28 @@ class App(QMainWindow):
         self.fill_table(self.calendar_table,[(iid,name,due,money(amount),status(due),note) for iid,name,due,amount,note in visible])
 
     def refresh_charts(self,pid):
-        cat_rows=self.db.execute("""SELECT category,SUM(amount_cents) FROM transactions
-            WHERE profile_id=? AND kind='expense' GROUP BY category ORDER BY SUM(amount_cents) DESC LIMIT 6""",(pid,)).fetchall()
-        self.category_chart.set_values([(str(k),v) for k,v in cat_rows])
-        hist=self.db.execute("""SELECT substr(recorded_at,1,7),kind,SUM(amount_cents) FROM transactions
-            WHERE profile_id=? GROUP BY substr(recorded_at,1,7),kind ORDER BY substr(recorded_at,1,7) DESC LIMIT 24""",(pid,)).fetchall()
+        cat_rows=self.db.execute("""SELECT category,SUM(amount_cents) FROM (
+            SELECT category,amount_cents FROM transactions WHERE profile_id=? AND kind='expense'
+            UNION ALL SELECT p.category,p.total_cents FROM card_purchases p
+            JOIN credit_cards c ON c.id=p.card_id WHERE c.profile_id=?)
+            GROUP BY category ORDER BY SUM(amount_cents) DESC,category""",(pid,pid)).fetchall()
+        def chart_slices(rows):
+            rows=list(rows)
+            if len(rows)>6:
+                return rows[:5]+[('Diğer',sum(value for _,value in rows[5:]))]
+            return rows
+        self.category_chart.set_values(chart_slices([(str(k),v) for k,v in cat_rows]))
+        hist=self.db.execute("""SELECT month,kind,SUM(amount_cents) FROM (
+            SELECT substr(recorded_at,1,7) AS month,kind,amount_cents FROM transactions WHERE profile_id=?
+            UNION ALL SELECT substr(p.purchase_date,1,7),'expense',p.total_cents
+            FROM card_purchases p JOIN credit_cards c ON c.id=p.card_id WHERE c.profile_id=?)
+            GROUP BY month,kind ORDER BY month DESC LIMIT 24""",(pid,pid)).fetchall()
         grouped={}
         for month,kind,value in hist:
             grouped.setdefault(month,[0,0])[0 if kind=='income' else 1]+=value
         self.trend_chart.set_values([(month, vals[0],vals[1]) for month,vals in sorted(grouped.items())[-6:]])
         accts=accounts_with_balances(self.db,pid)
-        self.asset_chart.set_values([(name,max(0,balance)) for _,name,kind,balance in accts if balance>0][:6])
+        self.asset_chart.set_values(chart_slices(sorted([(name,balance) for _,name,kind,balance in accts if balance>0],key=lambda row:row[1],reverse=True)))
 
     def import_document(self):
         filename,_=QFileDialog.getOpenFileName(self,'Banka veya bordro belgesi seç','','Belgeler (*.pdf *.csv *.xlsx *.txt)')
@@ -1152,6 +1208,17 @@ class App(QMainWindow):
             note='\n'.join(parsed['warnings']) or 'Belge incelemeye alındı.'
             QMessageBox.information(self,'Belge alındı',('Yeni kayıt' if created else 'Bu belge daha önce yüklendi')+f' (#{doc_id})\n'+note)
             self.refresh()
+            for r in range(self.doc_table.rowCount()):
+                if int(self.doc_table.item(r,0).text())==doc_id:
+                    self.doc_table.selectRow(r)
+                    break
+            if created and parsed['type'] in ('payslip','invoice','statement'):
+                self.select_page(9)
+                for r in range(self.doc_table.rowCount()):
+                    if int(self.doc_table.item(r,0).text())==doc_id:
+                        self.doc_table.selectRow(r)
+                        break
+                self.post_document_entry()
         except Exception as exc:QMessageBox.warning(self,'Belge alınamadı',str(exc))
 
     def preview_document_rows(self):
@@ -1175,31 +1242,66 @@ class App(QMainWindow):
         if warnings: self.doc_preview.setToolTip('\n'.join(warnings))
 
     def post_salary_document(self):
+        self.post_document_entry()
+
+    def post_document_entry(self):
         row=self.doc_table.currentRow()
         if row<0:
-            QMessageBox.information(self,'Belge seç','Önce tabloda bir bordro seçin.');return
+            QMessageBox.information(self,'Belge seç','Önce tabloda bir belge seçin.');return
         doc_id=int(self.doc_table.item(row,0).text())
         doc=self.db.execute('SELECT doc_type,status,extracted_json FROM imported_documents WHERE id=? AND profile_id=?',(doc_id,self.pid())).fetchone()
-        if not doc or doc[0]!='payslip' or doc[1]!='pending':
-            QMessageBox.warning(self,'İşlem yapılamadı','Sadece bekleyen maaş bordrosu gelir olarak işlenebilir.');return
+        if not doc or doc[0] not in ('payslip','invoice','statement') or doc[1]=='posted':
+            QMessageBox.warning(self,'İşlem yapılamadı','Bekleyen bordro, fatura veya ekstre satırı seçin.');return
         import json
         parsed=json.loads(doc[2]);accs=accounts_with_balances(self.db,self.pid())
-        if not accs:QMessageBox.warning(self,'Hesap gerekli','Önce bir banka hesabı açın.');return
-        d,form=self._form('Bordro geliri doğrula')
+        typ=doc[0]
+        choices=cards(self.db,self.pid()) if typ=='statement' else accs
+        if not choices:QMessageBox.warning(self,'Hesap / kart gerekli','Önce ilgili banka hesabını veya kredi kartını ekleyin.');return
+        d,form=self._form('Belgeden finans kaydı · kontrol ve onay')
+        info=QLabel('Ekstre alışverişi kart borcuna eklenir; banka bakiyesinden para düşülmez. Ödeme, iade, devir ve mevcut planın taksit satırlarını aktarmayın.' if typ=='statement' else 'Yalnız gerçekleşmiş ödeme / hesaba geçen maaşı onaylayın. Ödenmemiş fatura henüz gider değildir.')
+        info.setWordWrap(True);form.addRow(info)
         account=QComboBox()
-        for aid,name,kind,balance in accs:account.addItem(name,aid)
+        for item in choices:account.addItem(item[1],item[0])
         amount=QDoubleSpinBox();amount.setMaximum(100000000);amount.setDecimals(2)
-        amount.setValue(parsed['fields'].get('net',0)/100)
+        amount.setSuffix(' ₺');amount.setValue(parsed['fields'].get('net' if typ=='payslip' else 'total',0)/100)
         period=QLineEdit(str(parsed['fields'].get('period','Dönem belirtilmedi')))
-        paid=QCheckBox('Bu net maaşın hesaba geçtiğini doğruladım')
-        form.addRow('Banka hesabı',account);form.addRow('Net tutar',amount)
-        form.addRow('Bordro dönemi',period);form.addRow(paid)
+        category=QLineEdit('Maaş' if typ=='payslip' else ('Faturalar' if typ=='invoice' else 'Kart alışverişi'))
+        fields=parsed['fields']
+        desc=QLineEdit(('Fatura: '+str(fields.get('issuer',''))+' '+str(fields.get('invoice_number',''))).strip() if typ=='invoice' else 'Bordro')
+        when=QDateEdit();when.setCalendarPopup(True);when.setDisplayFormat('dd.MM.yyyy');when.setDate(QDate.currentDate())
+        source=QComboBox()
+        if typ=='statement':
+            linked={r[0] for r in self.db.execute('SELECT row_key FROM document_posting_links WHERE document_id=?',(doc_id,))}
+            candidates=[x for x in parsed.get('candidates',[]) if str(x['source_line']) not in linked and x['amount_cents']>0]
+            if not candidates:
+                QMessageBox.information(self,'Satır bulunamadı','Aktarılabilir alışveriş satırı yok. Metin içeren PDF veya Tarih;Açıklama;Tutar sütunlu CSV kullanın. Ekstre toplamı gider olarak aktarılmaz.');return
+            for item in candidates:source.addItem(f"{item['date']} · {item['description']} · {money(item['amount_cents'])}",item)
+            def choose_line(*_):
+                item=source.currentData();amount.setValue(item['amount_cents']/100)
+                desc.setText(item['description']);when.setDate(QDate.fromString(item['date'],'yyyy-MM-dd'))
+            source.currentIndexChanged.connect(choose_line);choose_line()
+            form.addRow('Alışveriş satırı',source)
+        form.addRow('Kredi kartı' if typ=='statement' else 'Banka / nakit hesabı',account)
+        form.addRow('Tutar',amount);form.addRow('Alışveriş tarihi' if typ=='statement' else 'Hesaba geçiş / ödeme tarihi',when)
+        form.addRow('Kategori',category)
+        if typ=='payslip':form.addRow('Bordro dönemi',period)
+        else:form.addRow('Açıklama',desc)
+        paid=QCheckBox('Bilgileri kontrol ettim; bu bir alışveriştir, ödeme/iade/devir değildir' if typ=='statement' else 'Ödemenin gerçekleştiğini ve bilgilerin doğru olduğunu onaylıyorum')
+        form.addRow(paid)
+        duplicate_note=QLabel('Aynı tarih, tutar ve açıklamayla kayıt varsa mevcut kayda bağlanır; tekrar gider/gelir oluşturulmaz.')
+        duplicate_note.setWordWrap(True);form.addRow(duplicate_note)
         self._buttons(d,form)
         if d.exec()!=QDialog.DialogCode.Accepted:return
         try:
-            approve_salary(self.db,self.pid(),doc_id,account.currentData(),from_spin(amount),period.text(),paid.isChecked())
+            _,created=approve_document_entry(self.db,self.pid(),doc_id,
+                account_id=account.currentData() if typ!='statement' else None,
+                card_id=account.currentData() if typ=='statement' else None,
+                cents=from_spin(amount),day=when.date().toString('yyyy-MM-dd'),
+                category=category.text(),description=desc.text(),confirmed=paid.isChecked(),
+                source_line=source.currentData()['source_line'] if typ=='statement' else None,period=period.text())
             self.refresh()
-        except Exception as exc:QMessageBox.warning(self,'Gelir kaydedilemedi',str(exc))
+            QMessageBox.information(self,'Belge işlendi','Finans kaydı oluşturuldu.' if created else 'Mevcut kayda bağlandı; tekrar kayıt oluşturulmadı.')
+        except Exception as exc:QMessageBox.warning(self,'Kayıt oluşturulamadı',str(exc))
 
     def create_account(self):
         dialog = AddAccountDialog(self)
@@ -1326,6 +1428,8 @@ class App(QMainWindow):
 
     def _buttons(self,d,f):
         b=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        b.button(QDialogButtonBox.StandardButton.Ok).setText('Onayla')
+        b.button(QDialogButtonBox.StandardButton.Cancel).setText('İptal')
         b.accepted.connect(d.accept);b.rejected.connect(d.reject);f.addRow(b)
 
     def _amount(self,initial=100):
@@ -1412,14 +1516,19 @@ class App(QMainWindow):
     def _set_detail_logo(self, target, bank):
         icon = self._bank_icon(bank)
         pixmap = icon.pixmap(QSize(110, 24), self.devicePixelRatioF())
+        target.setFixedSize(110, 34)
+        target.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        target.setScaledContents(False)
         target.setPixmap(pixmap)
-        target.setVisible(bool(bank and logo_path(bank)))
+        target.setVisible(bool(bank))
 
     def _bank_icon(self, bank):
         # Optional official logo assets supplied by the user; do not impersonate logos.
         source = logo_path(bank)
         if source:
-            return menu_icon(source)
+            icon = menu_icon(source)
+            if not icon.isNull():
+                return icon
         # Neutral initials badge, NOT a bank trademark/logo.
         pix = QPixmap(330, 72)
         pix.setDevicePixelRatio(3)
@@ -1634,7 +1743,7 @@ class App(QMainWindow):
             background='#edf5fa'; surface='#ffffff'; card='#ffffff'; ink='#102942'; border='#dceaf2'; muted='#597b91'
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{background:{background};color:{ink};font-family:'Segoe UI';font-size:13px;}}
-            QWidget#sidebar {{background:#092d49;border-radius:16px;color:white;}}
+            QWidget#sidebar {{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #031d36,stop:0.6 #083452,stop:1 #065365);border:1px solid #275d79;border-radius:18px;color:white;}}
             QScrollArea#sidebarMenuScroll {{background:transparent;border:none;}}
             QWidget#sidebarMenuContent {{background:#092d49;}}
             QScrollArea#sidebarMenuScroll QScrollBar:vertical {{background:#092d49;width:7px;margin:0;}}
@@ -1642,6 +1751,7 @@ class App(QMainWindow):
             QScrollArea#sidebarMenuScroll QScrollBar::add-line:vertical,QScrollArea#sidebarMenuScroll QScrollBar::sub-line:vertical {{height:0;}}
             QWidget#brandPanel {{background:#092d49;border:1px solid #174763;border-radius:12px;}}
             QWidget#brandPanel QLabel {{background:transparent;color:#ffffff;}}
+            QWidget#brandPanel QLabel#mascotAvatar {{background:#ffffff;border:1px solid #d6f5f3;border-radius:30px;}}
             QWidget#sidebar QLabel {{color:#eefbff;background:transparent;}}
             QWidget#sidebar QPushButton {{color:#eefbff;background:#123e5c;border:1px solid #275773;}}
             QWidget#sidebar QPushButton:disabled {{color:#8daabd;background:#0b304d;border:1px solid #16415c;}}
@@ -1673,11 +1783,33 @@ class App(QMainWindow):
             QLabel#slogan {{color:#d9f5f6;font-size:10px;font-style:italic;}}
             QLabel#heading {{font-size:27px;font-weight:800;}}
             QLabel#stat {{font-size:24px;font-weight:800;background:transparent;color:{ink};}}
+            QFrame#overviewCard {{background:{card};border:1px solid {border};border-top:4px solid #19c8bc;border-radius:15px;}}
+            QFrame#overviewCard[tone='rose'] {{border-top-color:#fb6685;}}
+            QFrame#overviewCard[tone='green'] {{border-top-color:#32c68b;}}
+            QFrame#overviewCard[tone='orange'] {{border-top-color:#ff9a43;}}
+            QFrame#overviewCard[tone='blue'] {{border-top-color:#468eff;}}
+            QFrame#overviewCard[tone='teal'] {{background:{'#123b48' if self.dark else '#e8fbf8'};}}
+            QFrame#overviewCard[tone='rose'] {{background:{'#382b43' if self.dark else '#fff0f4'};}}
+            QFrame#overviewCard[tone='green'] {{background:{'#163b38' if self.dark else '#eafaf1'};}}
+            QFrame#overviewCard[tone='orange'] {{background:{'#3c3430' if self.dark else '#fff4e9'};}}
+            QFrame#overviewCard[tone='blue'] {{background:{'#183551' if self.dark else '#edf4ff'};}}
+            QFrame#overviewCard QLabel {{background:transparent;}}
+            QLabel#overviewCaption {{color:{muted};font-size:12px;font-weight:600;}}
+            QLabel#overviewNote {{color:{muted};font-size:10px;}}
+            QFrame#overviewCard[tone='teal'] QLabel#stat {{color:{'#43e0cf' if self.dark else '#008b80'};}}
+            QFrame#overviewCard[tone='rose'] QLabel#stat {{color:{'#ff97ae' if self.dark else '#c33156'};}}
+            QFrame#overviewCard[tone='green'] QLabel#stat {{color:{'#65e4ad' if self.dark else '#078553'};}}
+            QFrame#overviewCard[tone='orange'] QLabel#stat {{color:{'#ffbd80' if self.dark else '#b35c00'};}}
+            QGroupBox#quickActions QPushButton {{background:{'#183c57' if self.dark else '#eaf6ff'};border:1px solid {'#32627e' if self.dark else '#c6e4f7'};color:{ink};}}
+            QGroupBox#quickActions QPushButton:hover {{background:#008d9a;color:white;}}
             QLabel#dashboardFoot {{color:{muted};font-size:12px;}}
             QProgressBar {{border:0;border-radius:6px;background:{border};height:8px;}}
             QProgressBar::chunk {{background:#18c6b5;border-radius:6px;}}
         """)
         self.style().unpolish(self);self.style().polish(self)
+        for chart in (self.category_chart, self.trend_chart, self.asset_chart):
+            chart.setProperty('darkTheme', self.dark)
+            chart.update()
         self._mark_active_nav()
 
     def _mark_active_nav(self):
@@ -1685,6 +1817,14 @@ class App(QMainWindow):
             b.setStyleSheet('background:#008da5;color:#ffffff;font-weight:700;' if page_index==self.stack.currentIndex() else 'background:transparent;color:#f0f9ff;border:0;')
 
     def closeEvent(self, event):
+        worker=getattr(self, '_logo_worker', None)
+        if worker is not None and worker.isRunning():
+            worker.requestInterruption()
+            if not getattr(self, '_waiting_for_logos', False):
+                self._waiting_for_logos=True
+                worker.finished.connect(self.close)
+            event.ignore()
+            return
         self.db.close()
         super().closeEvent(event)
 

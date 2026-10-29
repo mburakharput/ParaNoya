@@ -216,3 +216,16 @@ Logo önbelleği kullanıcı veri klasöründedir. Marka hakları ilgili sahiple
 
 Windows paketleme düzeltmeleri: sürüm etiketi 1.2.5.2; yazılabilir logo önbelleği;
 şema geçişi/yedekleme SQLite bağlantılarının kesin kapatılması. Finans hesaplama kuralları değiştirilmedi.
+## Belgeden onaylı gelir / gider aktarımı
+
+Akıllı Belge Merkezi'nde **Belge yükle** ile bordro, fatura veya kredi kartı ekstresi seçin. Yeni yüklemede kontrol/onay formu açılır; iptal ederseniz belge beklemede kalır. Daha sonra **Seçili belgeden gelir / gider oluştur** ile devam edebilirsiniz.
+
+- **Bordro:** okunan net tutarı, dönemi, hesabı ve hesaba geçiş tarihini kontrol edin. Ödeme gerçekleşti onayından sonra gelir oluşur.
+- **Fatura:** okunan toplam, firma ve fatura numarası açıklamaya önerilir. Ödemeyi yaptığınız banka/nakit hesabını ve ödeme tarihini seçip onaylayınca gider oluşur. Ödenmemiş faturayı henüz gider olarak onaylamayın.
+- **Kredi kartı ekstresi:** okunabilen alışveriş satırını, kartı, tarihi, kategoriyi ve tutarı onaylayın. Her seferinde bir satır işlenir. Alışveriş kart borcuna eklenir ve Gelir/Gider listesinde **Kart gideri** olarak görünür; banka/nakit bakiyesi bu aşamada azalmaz. Kart ödemesini ayrıca kart ödeme ekranından kaydedin.
+
+Aynı belge/satır tekrar işlenmez. Aynı hesap veya kartta tarih, tutar ve açıklaması eşleşen mevcut kayıt bulunursa yeni kayıt açılmaz; belge mevcut kayda bağlanır. Tarih/tutar eşleşip açıklama belirsizse işlem durdurulur; mevcut kaydı kontrol edin. Bu karşılaştırma tüm farklı belge biçimlerindeki mükerrerleri kesin olarak tespit edemez.
+
+Ekstre toplam borcu, devreden borç, kart ödemesi ve iade alışveriş olarak aktarılmaz. Taksitli alışverişin tek ekstre taksitini yeniden toplam alışveriş gibi girmeyin; mevcut taksit planıyla karşılaştırın. Otomatik toplu ekstre aktarımı yoktur.
+
+Destek: metin içeren PDF, TXT, CSV ve XLSX. Ekstre satır ayrıştırması `Tarih;Açıklama;Tutar`, sekme veya `|` sütunlu düzenleri tanır; her bankanın PDF düzeni okunamayabilir. Taranmış belge ve fotoğraf OCR'ı henüz yoktur. Banka bağlantısı/API entegrasyonu bu özelliğin parçası değildir.

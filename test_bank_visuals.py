@@ -40,6 +40,33 @@ class BankVisualTests(unittest.TestCase):
             self.assertTrue(all(image.pixelColor(x,y).alpha()==0
                                 for x in range(288,330) for y in range(72)))
 
+    def test_logo_bounds_are_stable_across_display_scaling(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'wide.svg'
+            path.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 30"><rect width="1000" height="30" fill="red"/></svg>')
+            for density in (1,1.5,2,3):
+                pix=menu_icon(path).pixmap(QSize(110,24),density)
+                self.assertLessEqual(pix.width()/pix.devicePixelRatio(),110)
+                self.assertLessEqual(pix.height()/pix.devicePixelRatio(),24)
+                self.assertFalse(pix.isNull())
+
+    def test_mascot_image_is_circular_with_white_rim(self):
+        from ailefinans import circular_mascot
+        image=circular_mascot(Path(__file__).parent/'assets'/'paranoya_mascot.png').toImage()
+        self.assertEqual(image.pixelColor(0,0).alpha(),0)
+        self.assertEqual(image.pixelColor(image.width()-1,0).alpha(),0)
+        self.assertEqual(image.pixelColor(image.width()//2,4).name(),'#ffffff')
+        self.assertGreater(image.pixelColor(image.width()//2,image.height()//2).alpha(),200)
+
+    def test_missing_logo_detail_uses_fixed_size_fallback(self):
+        from PySide6.QtWidgets import QLabel
+        host=SimpleNamespace(_bank_icon=lambda name: App._bank_icon(None,name),devicePixelRatioF=lambda:2)
+        label=QLabel()
+        App._set_detail_logo(host,label,'Bilinmeyen Banka')
+        self.assertEqual(label.size(),QSize(110,34))
+        self.assertFalse(label.hasScaledContents())
+        self.assertFalse(label.isHidden())
+
     def test_bank_metadata_resolves_custom_nicknames_without_guessing(self):
         db=sqlite3.connect(':memory:')
         try:

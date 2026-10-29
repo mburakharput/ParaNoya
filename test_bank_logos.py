@@ -9,6 +9,10 @@ class LogoTests(unittest.TestCase):
         self.assertEqual(LOGO_IDS['Garanti BBVA'], 'garanti')
         self.assertEqual(LOGO_IDS['Ziraat Katılım'], 'ziraatkatilim')
         self.assertNotEqual(LOGO_IDS['Ziraat Bankası'], LOGO_IDS['Ziraat Katılım'])
+    def test_cancelled_download_does_not_access_network(self):
+        with tempfile.TemporaryDirectory() as d:
+            with patch('urllib.request.urlopen', side_effect=AssertionError('Unexpected network')):
+                self.assertEqual(fetch_logos(d,cancelled=lambda:True),(0,0,[]))
     def test_missing_uses_fallback(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertIsNone(logo_path('Ziraat Dinamik', d))

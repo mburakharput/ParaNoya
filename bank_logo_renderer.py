@@ -57,7 +57,7 @@ def bank_icon(path, width=96, height=24):
         renderer = QSvgRenderer(QByteArray(qt_svg_bytes(path)))
     except (OSError, ET.ParseError, ValueError):
         return QIcon()
-    if not renderer.isValid():
+    if not renderer.isValid() or renderer.viewBoxF().width() <= 0 or renderer.viewBoxF().height() <= 0:
         return QIcon()
     density = 3
     canvas = QPixmap(width * density, height * density)

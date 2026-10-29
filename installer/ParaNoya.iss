@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.2.5.3"
+  #define AppVersion "1.2.5.5"
 #endif
 [Setup]
 AppId={{22874636-8296-42A7-8E61-56C5242C838F}

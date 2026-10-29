@@ -1,4 +1,6 @@
 import tempfile
+import unittest
+from contextlib import closing
 from pathlib import Path
 from datetime import date
 from finance_core import migrate,open_db,add_account,accounts_with_balances,summary
@@ -15,7 +17,7 @@ def test_dates():
 def test_kmh():
     with tempfile.TemporaryDirectory() as tmp:
         p=Path(tmp)/'db.sqlite';migrate(p)
-        with open_db(p) as db:
+        with closing(open_db(p)) as db, db:
             migrate_kmh(db)
             add_account(db,1,'Banka','bank',100000)
             add_account(db,1,'Nakit','cash',300000)
@@ -39,5 +41,11 @@ def test_kmh():
             except ValueError: pass
             else:raise AssertionError('overpayment accepted')
 
+def load_tests(loader, tests, pattern):
+    tests.addTest(unittest.FunctionTestCase(test_dates))
+    tests.addTest(unittest.FunctionTestCase(test_kmh))
+    return tests
+
+
 if __name__=='__main__':
-    test_dates();test_kmh();print('KMH tests passed')
+    unittest.main()
