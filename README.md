@@ -1,4 +1,21 @@
-# ParaNoya v1.2.5.6
+# ParaNoya v1.2.5.7
+
+## 1.2.5.7 — finans güvenilirliği ve ortak zemin düzeltmesi
+
+Kart/KMH ödemeleri ve limit kontrolleri, kontrol öncesinde alınan SQLite yazma
+kilidi altında yapılır. Aynı dönem fatura iki kez ödenemez; geçen aylardan kalan
+ödenmemiş faturalar görünür ve 240 dönem sınırı kaldırılmıştır.
+
+Belge Merkezi'ndeki **Yedek oluştur / Yedekten geri yükle** düğmeleri veritabanı,
+ilişkiler, sürüm ve ek belge bütünlüğünü denetler. Geri yükleme açık onay ister;
+veri bağlantıları kapandıktan sonra çalışır ve mevcut veri klasörünün tamamını
+aynı üst klasörde `*.before-restore-*` adıyla korur. Uygulama yeniden açılır.
+Yarım kalmış değiştirme bir sonraki açılışta kurtarılır. Diğer eski ParaNoya
+kopyalarını da geri yüklemeden önce kapatın. Yeni sürüm aynı veri klasöründe
+ikinci bir uygulama penceresinin açılmasını engeller.
+
+Tüm menülerde kart ve ayrıntı kutularındaki yazı zeminleri ortak tema üzerinden
+şeffaflaştırıldı; açık ve koyu temada istenmeyen renk şeritleri kaldırıldı.
 
 ## 1.2.5.6 — güvenli uygulama içi güncelleme
 
