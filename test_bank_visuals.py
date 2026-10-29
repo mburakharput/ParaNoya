@@ -27,7 +27,10 @@ class BankVisualTests(unittest.TestCase):
         from bank_logo_manager import logo_path
         path=logo_path('Ziraat Dinamik')
         self.assertIsNotNone(path)
-        image=menu_icon(path).pixmap(QSize(110,24),3).toImage()
+        icon=menu_icon(path)
+        self.assertFalse(icon.isNull(),'Bundled original logo must decode successfully')
+        image=icon.pixmap(QSize(110,24),3).toImage()
+        self.assertEqual(image.width(),330)
         self.assertGreater(sum(image.pixelColor(x,y).alpha()>0 for x in range(288) for y in range(72)),500)
         self.assertTrue(all(image.pixelColor(x,y).alpha()==0 for x in range(288,330) for y in range(72)))
 
