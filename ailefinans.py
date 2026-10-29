@@ -1,5 +1,6 @@
 import sys
 import sqlite3
+from contextlib import closing
 import shutil
 from pathlib import Path
 from datetime import datetime, date, timedelta
@@ -320,7 +321,7 @@ class App(QMainWindow):
         migrate_products(self.db)
         self._row_ids={'account':[], 'card':[], 'kmh':[]}
         self.dark = False
-        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.6')
+        self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.7')
         self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')))
         self.resize(1440, 900)
         self.setMinimumSize(920, 600)
@@ -608,7 +609,7 @@ class App(QMainWindow):
         cal.addLayout(filter_bar)
         self.calendar_table=self.make_table(['ID','Banka','Vade','Ödenecek','Durum','Açıklama']);cal.addWidget(self.calendar_table)
         cal.addWidget(QLabel('Fatura / abonelik yenilemeleri (ödeme onaylanmadan gider değildir)'))
-        self.calendar_recurring=self.make_table(['Ad','Tür','Vade','Tutar'])
+        self.calendar_recurring=self.make_table(['Ad','Tür','Vade','Tutar','Durum'])
         cal.addWidget(self.calendar_recurring)
         self.stack.addWidget(calpage)
         documents_page=QWidget()
@@ -617,6 +618,10 @@ class App(QMainWindow):
         upload=QPushButton('+ Belge yükle (PDF, CSV, Excel, TXT)')
         upload.clicked.connect(self.import_document)
         dv.addWidget(upload,alignment=Qt.AlignmentFlag.AlignLeft)
+        backup_tools=QHBoxLayout()
+        for title,callback in [('Yedek oluştur',self.create_backup),('Yedekten geri yükle',self.restore_from_backup)]:
+            button=QPushButton(title);button.clicked.connect(callback);backup_tools.addWidget(button)
+        backup_tools.addStretch();dv.addLayout(backup_tools)
         self.doc_table=self.make_table(['ID','Dosya','Tür','Durum','Tarih'])
         dv.addWidget(self.doc_table)
         preview_button=QPushButton('Seçili belgedeki öneri satırlarını göster')
@@ -643,8 +648,8 @@ class App(QMainWindow):
         for label,widget in [('Ad',self.rec_name),('Tür',self.rec_kind),('Kategori',self.rec_category),('Tutar',self.rec_amount),('Yenileme sıklığı',self.rec_freq),('İlk vade',self.rec_due)]:entry_form.addRow(label,widget)
         save_rec=QPushButton('＋  Düzenli ödeme ekle');save_rec.clicked.connect(self.save_recurring)
         entry_form.addRow(save_rec);recurring_layout.addWidget(entry)
-        recurring_layout.addWidget(QLabel('Gelecek ödemeler · Seçip hesap üzerinden ödeme yapabilirsiniz'))
-        self.rec_table=self.make_table(['ID','Ad','Tür','Vade','Tutar','Kategori']);recurring_layout.addWidget(self.rec_table)
+        recurring_layout.addWidget(QLabel('Gecikmiş ve gelecek ödemeler · Seçip hesap üzerinden ödeme yapabilirsiniz'))
+        self.rec_table=self.make_table(['ID','Ad','Tür','Vade','Tutar','Kategori','Durum']);recurring_layout.addWidget(self.rec_table)
         rec_buttons=QHBoxLayout();rec_pay=QPushButton('Seçili dönemi öde');rec_pay.clicked.connect(self.pay_recurring)
         rec_pause=QPushButton('Seçili aboneliği / faturayı durdur');rec_pause.clicked.connect(self.pause_recurring)
         rec_buttons.addWidget(rec_pay);rec_buttons.addWidget(rec_pause);rec_buttons.addStretch();recurring_layout.addLayout(rec_buttons)
@@ -1075,7 +1080,7 @@ class App(QMainWindow):
         self.update_kmh_details()
         self.refresh_calendar()
         if hasattr(self,'rec_table'):
-            self.fill_table(self.rec_table,[(i,n,'Fatura' if kind=='bill' else 'Abonelik',due,money(amt),cat) for i,n,kind,due,amt,cat in upcoming_items(self.db,pid,months_ahead=6)])
+            self.fill_table(self.rec_table,[(i,n,'Fatura' if kind=='bill' else 'Abonelik',due,money(amt),cat,'Gecikmiş' if due<date.today().isoformat() else 'Bekliyor') for i,n,kind,due,amt,cat in upcoming_items(self.db,pid,months_ahead=6)])
         self.fill_table(self.doc_table,[(did,name,TYPES.get(typ,typ),status,when) for did,name,typ,status,when,_ in list_docs(self.db,pid)])
         self.dashboard_info.setText('Kredi kartı kalan borcu: '+money(sum(c[-1] for c in cards(self.db,pid)))+'    |    Yaklaşan ödenmemiş taksit: '+str(len(upcoming(self.db,pid))))
 
@@ -1168,7 +1173,7 @@ class App(QMainWindow):
         self.calendar_overdue_label.setText(money(summaries['overdue']))
         self.calendar_total_label.setText(money(summaries['total']))
         if hasattr(self,'calendar_recurring'):
-            self.fill_table(self.calendar_recurring,[(name,'Fatura' if kind=='bill' else 'Abonelik',due,money(amt)) for _,name,kind,due,amt,_ in upcoming_items(self.db,self.pid(),months_ahead=3)])
+            self.fill_table(self.calendar_recurring,[(name,'Fatura' if kind=='bill' else 'Abonelik',due,money(amt),'Gecikmiş' if due<date.today().isoformat() else 'Bekliyor') for _,name,kind,due,amt,_ in upcoming_items(self.db,self.pid(),months_ahead=3)])
         code=self.calendar_filter.currentData() or 'all'
         visible=filter_calendar(rows,code)
         today=date.today().isoformat()
@@ -1199,6 +1204,35 @@ class App(QMainWindow):
         self.trend_chart.set_values([(month, vals[0],vals[1]) for month,vals in sorted(grouped.items())[-6:]])
         accts=accounts_with_balances(self.db,pid)
         self.asset_chart.set_values(chart_slices(sorted([(name,balance) for _,name,kind,balance in accts if balance>0],key=lambda row:row[1],reverse=True)))
+
+    def create_backup(self):
+        from backup_manager import make_backup
+        filename,_=QFileDialog.getSaveFileName(self,'Yedek oluştur',str(Path.home()/'Documents'/('ParaNoya-'+datetime.now().strftime('%Y%m%d-%H%M%S')+'.zip')),'Yedek (*.zip)')
+        if not filename:return
+        try:
+            make_backup(DB_DIR,filename)
+            QMessageBox.information(self,'Yedek hazır','Veritabanı ve ek belgeler doğrulandı.\n'+filename)
+        except Exception as exc:QMessageBox.warning(self,'Yedek alınamadı',str(exc))
+
+    def restore_from_backup(self):
+        from backup_manager import verify_backup
+        controller=getattr(self,'update_controller',None)
+        if controller is not None and controller.is_busy:
+            QMessageBox.information(self,'İşlem sürüyor','Güncelleme işlemi tamamlandıktan sonra yeniden deneyin.');return
+        filename,_=QFileDialog.getOpenFileName(self,'Geri yüklenecek yedeği seç','','Yedek (*.zip)')
+        if not filename:return
+        try:verify_backup(filename)
+        except Exception as exc:
+            QMessageBox.warning(self,'Yedek geçersiz',str(exc));return
+        if QMessageBox.question(self,'Yedekten geri yükle',
+                'Diğer ParaNoya pencerelerini kapatın. Mevcut kayıtlar seçilen yedekle değiştirilecek.\n'
+                'Mevcut veri klasörünün tamamı ayrı bir kurtarma kopyası olarak korunacak.\n'
+                'Uygulama kapanıp yeniden açılacak. Devam edilsin mi?',
+                QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)!=QMessageBox.StandardButton.Yes:return
+        self._pending_restore=filename
+        self.setEnabled(False)
+        self.close()
 
     def import_document(self):
         filename,_=QFileDialog.getOpenFileName(self,'Banka veya bordro belgesi seç','','Belgeler (*.pdf *.csv *.xlsx *.txt)')
@@ -1749,6 +1783,8 @@ class App(QMainWindow):
             background='#edf5fa'; surface='#ffffff'; card='#ffffff'; ink='#102942'; border='#dceaf2'; muted='#597b91'
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{background:{background};color:{ink};font-family:'Segoe UI';font-size:13px;}}
+            QLabel {{background:transparent;}}
+            QFrame#cardMetric QLabel, QFrame#cardDetails QLabel, QGroupBox QLabel {{background:transparent;}}
             QWidget#sidebar {{background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #031d36,stop:0.6 #083452,stop:1 #065365);border:1px solid #275d79;border-radius:18px;color:white;}}
             QScrollArea#sidebarMenuScroll {{background:transparent;border:none;}}
             QWidget#sidebarMenuContent {{background:#092d49;}}
@@ -1840,22 +1876,35 @@ class App(QMainWindow):
 
 
 def main():
+    from PySide6.QtCore import QLockFile
+    app = QApplication(sys.argv)
+    # The lock lives outside the directory which recovery may rename.
+    DB_DIR.parent.mkdir(parents=True,exist_ok=True)
+    application_lock=QLockFile(str(DB_DIR.parent/(DB_DIR.name+'.paranoya.lock')))
+    application_lock.setStaleLockTime(0)
+    if not application_lock.tryLock(0):
+        QMessageBox.information(None,'ParaNoya zaten açık','Bu veri klasörü başka bir ParaNoya penceresinde açık. Önce o pencereyi kapatın.')
+        return
+    from backup_manager import recover_interrupted_restore
+    try:recover_interrupted_restore(DB_DIR)
+    except Exception as exc:
+        QMessageBox.critical(None,'Veri kurtarma gerekli',str(exc))
+        return
     # Capture a consistent snapshot BEFORE changing the schema.
     DB_DIR.mkdir(parents=True, exist_ok=True)
     if DB_PATH.exists():
-        with sqlite3.connect(DB_PATH) as source:
+        with closing(sqlite3.connect(DB_PATH)) as source:
             old_version = source.execute('PRAGMA user_version').fetchone()[0]
             if old_version < 8:
                 backup_name='ailefinans.before_v08_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f')+'.db'
-                with sqlite3.connect(DB_DIR / backup_name) as target:
+                with closing(sqlite3.connect(DB_DIR / backup_name)) as target:
                     source.backup(target)
     try:
         migrate()
     except Exception as exc:
         print('Veritabanı açılamadı / güncellenemedi:', exc, file=sys.stderr)
         raise
-    app = QApplication(sys.argv)
-    with open_db() as db:
+    with closing(open_db()) as db:
         migrate_kmh(db)
         with db:
             db.execute('''CREATE TABLE IF NOT EXISTS card_catalog_links (card_id INTEGER PRIMARY KEY REFERENCES credit_cards(id) ON DELETE CASCADE, bank TEXT NOT NULL, card_model TEXT NOT NULL)''')
@@ -1868,7 +1917,22 @@ def main():
             db.execute('PRAGMA user_version=8')
     window = App()
     window.show()
-    sys.exit(app.exec())
+    result=app.exec()
+    pending=getattr(window,'_pending_restore',None)
+    if pending:
+        from backup_manager import restore_backup
+        try:
+            recovery=restore_backup(pending,DB_DIR,confirmed=True)
+            QMessageBox.information(None,'Geri yükleme tamamlandı','Önceki kayıtlarınızın kurtarma klasörü:\n'+str(recovery))
+        except Exception as exc:
+            QMessageBox.warning(None,'Geri yükleme tamamlanamadı',str(exc))
+        application_lock.unlock()
+        import subprocess
+        command=[sys.executable]
+        if not getattr(sys,'frozen',False):command.append(str(Path(__file__).resolve()))
+        subprocess.Popen(command,shell=False,close_fds=True)
+    application_lock.unlock()
+    sys.exit(result)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
+from write_transaction import write_transaction
 """Offline recurring bills/subscriptions. Money is stored in integer kuruş.
 Creating a schedule never posts expense; confirming a paid occurrence posts once.
 """
@@ -42,30 +43,36 @@ def upcoming_items(db,profile,today=None,months_ahead=12):
     rows=db.execute('SELECT id,name,kind,category,amount_cents,frequency,first_due FROM recurring_items WHERE profile_id=? AND active=1',(profile,)).fetchall()
     result=[]
     for item_id,name,kind,cat,amount,freq,first in rows:
-        for i in range(240):
+        paid_dates={r[0] for r in db.execute('SELECT due_date FROM recurring_payments WHERE item_id=?',(item_id,))}
+        origin=date.fromisoformat(first)
+        end=date.fromisoformat(next_occurrence(today.replace(day=1).isoformat(),'monthly',months_ahead))
+        step={'monthly':1,'quarterly':3,'yearly':12}[freq]
+        count=max(0,((end.year-origin.year)*12+end.month-origin.month)//step+1)
+        for i in range(count):
             due=next_occurrence(first,freq,i)
             if due > next_occurrence(today.replace(day=1).isoformat(),'monthly',months_ahead):break
-            if due < today.replace(day=1).isoformat():continue
-            paid=db.execute('SELECT 1 FROM recurring_payments WHERE item_id=? AND due_date=?',(item_id,due)).fetchone()
-            if not paid: result.append((item_id,name,kind,due,amount,cat))
+            if due not in paid_dates: result.append((item_id,name,kind,due,amount,cat))
     return sorted(result,key=lambda r:(r[3],r[1]))
 
 def pay_occurrence(db,profile,item_id,due_date,account_id):
-    row=db.execute('SELECT name,category,amount_cents,frequency,first_due,active FROM recurring_items WHERE id=? AND profile_id=?',(item_id,profile)).fetchone()
-    if not row or not row[5]:raise ValueError('Etkin ödeme bulunamadı')
-    name,category,amount,freq,start,_=row
-    if date.fromisoformat(due_date) < date.fromisoformat(start):raise ValueError('Geçersiz vade')
-    if not any(next_occurrence(start,freq,i)==due_date for i in range(240)):
-        raise ValueError('Bu tarih ödeme planında yok')
-    if not db.execute('SELECT 1 FROM accounts WHERE id=? AND profile_id=?',(account_id,profile)).fetchone():
-        raise ValueError('Seçilen hesap bu profile ait değil')
-    if db.execute('SELECT 1 FROM recurring_payments WHERE item_id=? AND due_date=?',(item_id,due_date)).fetchone():
-        raise ValueError('Bu dönemin ödemesi zaten kaydedilmiş')
-    with db:
+    with write_transaction(db):
+        row=db.execute('SELECT name,category,amount_cents,frequency,first_due,active FROM recurring_items WHERE id=? AND profile_id=?',(item_id,profile)).fetchone()
+        if not row or not row[5]:raise ValueError('Etkin ödeme bulunamadı')
+        name,category,amount,freq,start,_=row
+        if date.fromisoformat(due_date) < date.fromisoformat(start):raise ValueError('Geçersiz vade')
+        origin=date.fromisoformat(start);due=date.fromisoformat(due_date)
+        months=(due.year-origin.year)*12+due.month-origin.month
+        step={'monthly':1,'quarterly':3,'yearly':12}[freq]
+        if months % step or next_occurrence(start,freq,months//step)!=due_date:
+            raise ValueError('Bu tarih ödeme planında yok')
+        if not db.execute('SELECT 1 FROM accounts WHERE id=? AND profile_id=?',(account_id,profile)).fetchone():
+            raise ValueError('Seçilen hesap bu profile ait değil')
+        if db.execute('SELECT 1 FROM recurring_payments WHERE item_id=? AND due_date=?',(item_id,due_date)).fetchone():
+            raise ValueError('Bu dönemin ödemesi zaten kaydedilmiş')
         tx=db.execute('INSERT INTO transactions(profile_id,account_id,kind,category,description,amount_cents) VALUES (?,?,?,?,?,?)',
             (profile,account_id,'expense',category,f'{name} · {due_date}',amount)).lastrowid
         db.execute('INSERT INTO recurring_payments(item_id,due_date,transaction_id) VALUES (?,?,?)',(item_id,due_date,tx))
-    return tx
+        return tx
 
 def set_active(db,profile,item_id,active):
     with db:

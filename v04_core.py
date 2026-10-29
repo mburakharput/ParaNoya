@@ -1,3 +1,4 @@
+from write_transaction import write_transaction
 from datetime import date, timedelta
 import calendar
 from finance_core import money
@@ -65,26 +66,26 @@ def first_due(purchase_date,statement_day,due_day):
     return d
 
 def purchase(db,profile,card_id,category,description,amount,installments,purchased=None):
-    if amount<=0 or not 1<=installments<=60 or amount<installments or not category.strip():
-        raise ValueError('Alışveriş tutarı/taksit/kategori geçersiz.')
-    row=db.execute('SELECT statement_day,due_day FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
-    if not row: raise ValueError('Kart bu çalışma alanına ait değil.')
-    day=date.fromisoformat(purchased) if purchased else date.today()
-    first=first_due(day,*row)
-    q,r=divmod(amount,installments)
-    with db:
+    with write_transaction(db):
+        if amount<=0 or not 1<=installments<=60 or amount<installments or not category.strip():
+            raise ValueError('Alışveriş tutarı/taksit/kategori geçersiz.')
+        row=db.execute('SELECT statement_day,due_day FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
+        if not row: raise ValueError('Kart bu çalışma alanına ait değil.')
+        day=date.fromisoformat(purchased) if purchased else date.today()
+        first=first_due(day,*row)
+        q,r=divmod(amount,installments)
         cursor=db.execute('INSERT INTO card_purchases(card_id,category,description,total_cents,installments,purchase_date) VALUES (?,?,?,?,?,?)',(card_id,category.strip(),description.strip(),amount,installments,day.isoformat()))
         db.executemany('INSERT INTO card_installments(purchase_id,sequence,due_date,amount_cents) VALUES (?,?,?,?)',[(cursor.lastrowid,i+1,due_in_month(first,i,row[1]).isoformat(),q+(1 if i<r else 0)) for i in range(installments)])
-    return cursor.lastrowid
+        return cursor.lastrowid
 
 def pay_card(db,profile,card_id,account_id,amount):
-    if amount<=0: raise ValueError('Ödeme pozitif olmalı.')
-    row=db.execute('SELECT 1 FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
-    acct=db.execute('SELECT 1 FROM accounts WHERE id=? AND profile_id=?',(account_id,profile)).fetchone()
-    debt=db.execute('''SELECT COALESCE(SUM(p.total_cents),0)-COALESCE((SELECT SUM(amount_cents) FROM card_payments WHERE card_id=?),0) FROM card_purchases p WHERE p.card_id=?''',(card_id,card_id)).fetchone()[0]
-    if not row or not acct or amount>debt:raise ValueError('Hesap, kart veya borç tutarı geçersiz.')
-    # Payments reduce card debt and bank/cash balances; NEVER add another expense.
-    with db:
+    with write_transaction(db):
+        if amount<=0: raise ValueError('Ödeme pozitif olmalı.')
+        row=db.execute('SELECT 1 FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
+        acct=db.execute('SELECT 1 FROM accounts WHERE id=? AND profile_id=?',(account_id,profile)).fetchone()
+        debt=db.execute('''SELECT COALESCE(SUM(p.total_cents),0)-COALESCE((SELECT SUM(amount_cents) FROM card_payments WHERE card_id=?),0) FROM card_purchases p WHERE p.card_id=?''',(card_id,card_id)).fetchone()[0]
+        if not row or not acct or amount>debt:raise ValueError('Hesap, kart veya borç tutarı geçersiz.')
+        # Payments reduce card debt and bank/cash balances; NEVER add another expense.
         db.execute('INSERT INTO card_payments(card_id,account_id,amount_cents) VALUES (?,?,?)',(card_id,account_id,amount))
         # allocate payment to oldest unpaid installments, accounting for prior allocations
         remaining=amount
