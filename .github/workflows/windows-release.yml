@@ -10,10 +10,15 @@ on:
         description: Publish current installer version after checks
         type: boolean
         default: false
+      reuse_run_id:
+        description: Optional completed run with a successful build; only workflow-only changes may follow it
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.reuse_run_id == ''
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -83,22 +88,46 @@ jobs:
           retention-days: 30
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish)) && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.reuse_run_id != ''))
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: ParaNoya-Windows-x64
-          path: release-assets
       - uses: actions/checkout@v4
-      - name: Publish verified installer
+      - name: Validate artifact source
+        id: source
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           COMMIT: ${{ github.sha }}
+          REUSE_RUN: ${{ inputs.reuse_run_id }}
+        run: |
+          source_sha="$COMMIT"
+          if [[ -n "$REUSE_RUN" ]]; then
+            [[ "$REUSE_RUN" =~ ^[0-9]+$ ]] || { echo 'Invalid source run'; exit 1; }
+            gh api "repos/$GH_REPO/actions/runs/$REUSE_RUN" > /tmp/source-run.json
+            jq -e '.status == "completed" and .path == ".github/workflows/windows-release.yml"' /tmp/source-run.json >/dev/null
+            gh api "repos/$GH_REPO/actions/runs/$REUSE_RUN/jobs?per_page=100" > /tmp/source-jobs.json
+            jq -e '[.jobs[] | select(.name == "build" and .conclusion == "success")] | length == 1' /tmp/source-jobs.json >/dev/null
+            source_sha=$(jq -r '.head_sha' /tmp/source-run.json)
+            gh api "repos/$GH_REPO/compare/$source_sha...$COMMIT" > /tmp/source-diff.json
+            jq -e '(.status == "identical" or .status == "ahead") and (.files | length <= 1) and all(.files[]; .filename == ".github/workflows/windows-release.yml" and .status == "modified")' /tmp/source-diff.json >/dev/null
+          fi
+          echo "sha=$source_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ParaNoya-Windows-x64
+          path: release-assets
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.reuse_run_id || github.run_id }}
+      - name: Publish verified installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ steps.source.outputs.sha }}
           REF: ${{ github.ref }}
+          ARTIFACT_RUN: ${{ inputs.reuse_run_id || github.run_id }}
         run: |
           version=$(sed -nE 's/^[[:space:]]*#define AppVersion "([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?)".*/\1/p' installer/ParaNoya.iss | head -n 1)
           test -n "$version" || { echo "Installer version missing"; exit 1; }
@@ -106,5 +135,9 @@ jobs:
           if [[ "$REF" == refs/tags/* ]]; then
             test "${REF#refs/tags/}" = "$tag" || { echo "Tag/version mismatch"; exit 1; }
           fi
+          test -f "release-assets/ParaNoya-$version-Windows-x64-Setup.exe"
+          (cd release-assets && sha256sum --check SHA256SUMS.txt)
+          jq -e '.ok == true and .database == "temporary"' release-assets/verification.json >/dev/null
+          jq -n --arg repository "$GH_REPO" --arg commit "$COMMIT" --arg run "$ARTIFACT_RUN" --arg version "$version" '{repository:$repository,source_commit:$commit,build_run_id:$run,version:$version}' > release-assets/build-provenance.json
           if gh release view "$tag" >/dev/null 2>&1; then echo "Release $tag exists; refusing overwrite"; exit 1; fi
-          gh release create "$tag" release-assets/* --target "$COMMIT" --title "ParaNoya $tag" --notes "Windows x64 kurulum paketi. Windows runner üzerinde testler, kurulum, açılış, yeniden kurulum ve kaldırma kontrolleri başarıyla tamamlandı. Kişisel finans verileri pakete dahil değildir. Kurulum dosyası kod imzalı değildir."
+          gh release create "$tag" release-assets/* --target "$COMMIT" --title "ParaNoya $tag" --notes "Bordrodan onaylı gelir, ödenmiş faturadan gider ve ekstre alışverişinden kart borcu aktarımı eklendi. Mükerrer kayıt ve profil kontrolleri, finansal veri korumaları, ay sonu vade düzeltmeleri, canlı pano, otomatik banka logoları ve dairesel baykuş görünümü bu sürümdedir. 74 test ile Windows derleme, kurulum, açılış, yeniden kurulum ve kaldırma kontrolleri geçti. Kişisel finans verileri pakete dahil değildir. Kurulum dosyası kod imzalı değildir; otomatik güncelleme ve banka bağlantısı etkin değildir."
