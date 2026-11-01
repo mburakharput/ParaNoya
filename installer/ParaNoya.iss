@@ -2,6 +2,8 @@
   #define AppVersion "1.2.5.3"
 #endif
 [Setup]
+ShowLanguageDialog=yes
+UsePreviousLanguage=yes
 AppId={{22874636-8296-42A7-8E61-56C5242C838F}
 AppName=ParaNoya
 AppVersion={#AppVersion}
@@ -19,10 +21,18 @@ WizardStyle=modern
 SetupIconFile=..\assets\paranoya.ico
 UninstallDisplayIcon={app}\ParaNoya.exe
 CloseApplications=yes
+[Languages]
+Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[CustomMessages]
+turkish.DesktopShortcut=Masaüstü kısayolu oluştur
+english.DesktopShortcut=Create a desktop shortcut
+
 [Files]
 Source: "..\dist\ParaNoya\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Tasks]
-Name: desktopicon; Description: "Masaüstü kısayolu oluştur"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 [Icons]
 Name: "{group}\ParaNoya"; Filename: "{app}\ParaNoya.exe"
 Name: "{autodesktop}\ParaNoya"; Filename: "{app}\ParaNoya.exe"; Tasks: desktopicon
