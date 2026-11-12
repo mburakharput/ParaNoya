@@ -70,6 +70,25 @@ class DocumentPostingTests(unittest.TestCase):
         self.post(did,card_id=1,source_line=2,cents=5000,description='Kitap',day='2026-10-30')
         self.assertEqual(self.db.execute('SELECT status FROM imported_documents WHERE id=?',(did,)).fetchone()[0],'posted')
 
+    def test_statement_rejects_modified_amount_and_date(self):
+        did=self.stage_text('29.10.2026;Market;125,00','statement')
+        for kwargs in ({'cents':12501}, {'day':'2026-10-30'}):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaisesRegex(ValueError,'belge satırıyla eşleşmiyor'):
+                    self.post(did,card_id=1,source_line=1,description='Market',**kwargs)
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM card_purchases').fetchone()[0],0)
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM document_posting_links').fetchone()[0],0)
+        self.assertEqual(self.db.execute('SELECT status FROM imported_documents WHERE id=?',(did,)).fetchone()[0],'pending')
+
+    def test_statement_cannot_bypass_card_limit(self):
+        # The card has a 1000 TL limit; an imported 1001 TL purchase must fail.
+        did=self.stage_text('29.10.2026;Market;1001,00','statement')
+        with self.assertRaisesRegex(ValueError,'kartın kullanılabilir limitini aşıyor'):
+            self.post(did,card_id=1,source_line=1,cents=100100,description='Market')
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM card_purchases').fetchone()[0],0)
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM card_installments').fetchone()[0],0)
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM document_posting_links').fetchone()[0],0)
+
     def test_statement_links_previously_recorded_purchase(self):
         purchase(self.db,1,1,'Market','Market',12500,1,'2026-10-29')
         did=self.stage_text('29.10.2026;Market;125,00','statement')
