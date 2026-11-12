@@ -429,11 +429,8 @@ class App(QMainWindow):
         # Keep the dashboard usable on smaller Windows displays; scroll vertically.
         self.dashboard.setMinimumWidth(720)
         dash=QVBoxLayout(self.dashboard)
-        dash.setContentsMargins(18,18,18,18)
-        dash.setSpacing(16)
-        welcome=QLabel('Finansal Genel Bakış')
-        welcome.setObjectName('dashboardTitle')
-        dash.addWidget(welcome)
+        dash.setContentsMargins(12,8,12,14)
+        dash.setSpacing(13)
         dashboard_intro=QLabel('Hesaplarınız, kart borçlarınız ve finans hareketleriniz tek ekranda.')
         dashboard_intro.setObjectName('dashboardSubtitle')
         dashboard_intro.setWordWrap(True)
@@ -446,10 +443,17 @@ class App(QMainWindow):
         self.remaining_value=self.make_card(overview,4,'◎  Gelir - Gider Farkı')
         for column in range(6):overview.setColumnStretch(column,1)
         dash.addLayout(overview)
-        quick_box=QGroupBox('Hızlı İşlemler')
+        quick_box=QFrame()
         quick_box.setObjectName('quickActions')
-        quick=QHBoxLayout(quick_box)
+        quick_area=QVBoxLayout(quick_box)
+        quick_area.setContentsMargins(14,10,14,14)
+        quick_area.setSpacing(8)
+        quick_title=QLabel('Hızlı İşlemler')
+        quick_title.setObjectName('quickActionsTitle')
+        quick_area.addWidget(quick_title)
+        quick=QHBoxLayout()
         quick.setSpacing(10)
+        quick_area.addLayout(quick)
         for lbl,cb in [('＋  İşlem Ekle',self.create_transaction),('⇄  Transfer',self.create_transfer),('▧  Ekstre Yükle',self.import_document),('▣  Kart Ekle',self.new_card)]:
             b=QPushButton(lbl)
             b.setMinimumHeight(42)
@@ -477,6 +481,7 @@ class App(QMainWindow):
         due_layout.addWidget(self.dashboard_due);bottom.addWidget(due_box,2)
         dash.addLayout(bottom)
         dashboard_scroll=QScrollArea()
+        dashboard_scroll.setObjectName('dashboardScroll')
         dashboard_scroll.setWidgetResizable(True)
         dashboard_scroll.setFrameShape(QFrame.Shape.NoFrame)
         dashboard_scroll.setWidget(self.dashboard)
@@ -1839,7 +1844,6 @@ class App(QMainWindow):
             QLineEdit#globalSearch {{border-radius:16px;padding:12px 18px;background:{surface};}}
             QLabel#slogan {{color:#d9f5f6;font-size:10px;font-style:italic;}}
             QLabel#heading {{font-size:27px;font-weight:800;}}
-            QLabel#dashboardTitle {{font-size:22px;font-weight:800;color:{ink};}}
             QLabel#dashboardSubtitle {{font-size:12px;color:{muted};}}
             QLabel#stat {{font-size:24px;font-weight:800;background:transparent;color:{ink};}}
             QFrame#overviewCard {{background:{card};border:1px solid {border};border-top:4px solid #19c8bc;border-radius:15px;}}
@@ -1859,8 +1863,15 @@ class App(QMainWindow):
             QFrame#overviewCard[tone='rose'] QLabel#stat {{color:{'#ff97ae' if self.dark else '#c33156'};}}
             QFrame#overviewCard[tone='green'] QLabel#stat {{color:{'#65e4ad' if self.dark else '#078553'};}}
             QFrame#overviewCard[tone='orange'] QLabel#stat {{color:{'#ffbd80' if self.dark else '#b35c00'};}}
-            QGroupBox#quickActions QPushButton {{background:{'#183c57' if self.dark else '#eaf6ff'};border:1px solid {'#32627e' if self.dark else '#c6e4f7'};color:{ink};}}
-            QGroupBox#quickActions QPushButton:hover {{background:#008d9a;color:white;}}
+            QFrame#quickActions {{background:{card};border:1px solid {border};border-radius:14px;}}
+            QLabel#quickActionsTitle {{color:{ink};font-size:13px;font-weight:700;}}
+            QFrame#quickActions QPushButton {{background:{'#183c57' if self.dark else '#eaf6ff'};border:1px solid {'#32627e' if self.dark else '#c6e4f7'};color:{ink};}}
+            QFrame#quickActions QPushButton:hover {{background:#008d9a;color:white;}}
+            QScrollArea#dashboardScroll {{background:transparent;border:none;}}
+            QScrollArea#dashboardScroll QScrollBar:vertical {{background:transparent;width:9px;margin:0;}}
+            QScrollArea#dashboardScroll QScrollBar::handle:vertical {{background:{'#426580' if self.dark else '#b6cad7'};min-height:42px;border-radius:4px;}}
+            QScrollArea#dashboardScroll QScrollBar::add-line:vertical,QScrollArea#dashboardScroll QScrollBar::sub-line:vertical {{height:0;}}
+            QScrollArea#dashboardScroll QScrollBar::add-page:vertical,QScrollArea#dashboardScroll QScrollBar::sub-page:vertical {{background:transparent;}}
             QLabel#dashboardFoot {{color:{muted};font-size:12px;}}
             QProgressBar {{border:0;border-radius:6px;background:{border};height:8px;}}
             QProgressBar::chunk {{background:#18c6b5;border-radius:6px;}}
