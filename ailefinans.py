@@ -365,6 +365,11 @@ class App(QMainWindow):
         menu_scroll.setWidgetResizable(True)
         menu_scroll.setFrameShape(QFrame.Shape.NoFrame)
         menu_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        menu_scroll.verticalScrollBar().setStyleSheet('QScrollBar:vertical {background:#092d49;width:8px;margin:0;border:0;}'
+            'QScrollBar::handle:vertical {background:#38718b;min-height:36px;border-radius:4px;}'
+            'QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical {height:0;border:0;}'
+            'QScrollBar::up-arrow:vertical,QScrollBar::down-arrow:vertical {width:0;height:0;}'
+            'QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical {background:#092d49;}')
         menu_widget=QWidget();menu_widget.setObjectName('sidebarMenuContent')
         menu_layout=QVBoxLayout(menu_widget)
         menu_layout.setContentsMargins(0,7,0,7)
@@ -454,10 +459,11 @@ class App(QMainWindow):
         quick_box=QFrame()
         quick_box.setObjectName('quickActions')
         quick_area=QVBoxLayout(quick_box)
-        quick_area.setContentsMargins(14,10,14,14)
+        quick_area.setContentsMargins(16,17,16,14)
         quick_area.setSpacing(8)
         quick_title=QLabel('Hızlı İşlemler')
         quick_title.setObjectName('quickActionsTitle')
+        quick_title.setMinimumHeight(22)
         quick_area.addWidget(quick_title)
         quick=QHBoxLayout()
         quick.setSpacing(10)
@@ -467,6 +473,7 @@ class App(QMainWindow):
             b.setMinimumHeight(42)
             b.clicked.connect(cb)
             quick.addWidget(b,1)
+        quick_box.setMinimumHeight(113)
         dash.addWidget(quick_box)
         middle=QGridLayout();middle.setSpacing(12)
         self.category_chart=FinanceBars('Giderlerin Kategori Dağılımı')
@@ -491,6 +498,12 @@ class App(QMainWindow):
         dashboard_scroll=QScrollArea()
         dashboard_scroll.setObjectName('dashboardScroll')
         dashboard_scroll.setWidgetResizable(True)
+        dashboard_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        dashboard_scroll.verticalScrollBar().setStyleSheet('QScrollBar:vertical {background:#e6f1f7;width:8px;margin:0;border:0;}'
+            'QScrollBar::handle:vertical {background:#a0bacb;min-height:44px;border-radius:4px;}'
+            'QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical {height:0;border:0;}'
+            'QScrollBar::up-arrow:vertical,QScrollBar::down-arrow:vertical {width:0;height:0;}'
+            'QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical {background:#e6f1f7;}')
         dashboard_scroll.setFrameShape(QFrame.Shape.NoFrame)
         dashboard_scroll.setWidget(self.dashboard)
         self.stack.addWidget(dashboard_scroll)
@@ -2484,6 +2497,12 @@ class App(QMainWindow):
             QProgressBar::chunk {{background:#18c6b5;border-radius:6px;}}
         """)
         self.style().unpolish(self);self.style().polish(self)
+        self.stack.widget(0).verticalScrollBar().setStyleSheet(
+            'QScrollBar:vertical {background:'+('#102f47' if self.dark else '#e6f1f7')+';width:8px;margin:0;border:0;}'
+            'QScrollBar::handle:vertical {background:'+('#46718c' if self.dark else '#a0bacb')+';min-height:44px;border-radius:4px;}'
+            'QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical {height:0;border:0;}'
+            'QScrollBar::up-arrow:vertical,QScrollBar::down-arrow:vertical {width:0;height:0;}'
+            'QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical {background:transparent;}')
         for chart in (self.category_chart, self.trend_chart, self.asset_chart):
             chart.setProperty('darkTheme', self.dark)
             chart.update()
