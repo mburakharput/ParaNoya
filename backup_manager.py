@@ -92,7 +92,9 @@ def _unpack(path, folder):
                     digest.update(chunk);output.write(chunk)
             if count!=info['bytes'] or digest.hexdigest()!=info['sha256']:
                 raise ValueError('Yedek dosya doğrulaması başarısız: '+name)
-    _database(folder/'ailefinans.db',folder)
+    # A valid SQLite file is not necessarily a ParaNoya database.
+    # Reject unrelated databases during both verification and restore.
+    _database(folder/'ailefinans.db',folder,require_app=True)
 
 
 def verify_backup(path):
