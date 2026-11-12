@@ -23,6 +23,35 @@ class TestRecurring(unittest.TestCase):
  def test_profile_guard(self):
   item=add_item(self.db,1,'Hizmet','subscription','Abonelik',1200,'monthly','2026-11-01')
   with self.assertRaises(ValueError):pay_occurrence(self.db,2,item,'2026-11-01',self.acc)
+ def test_final_month_includes_all_due_days(self):
+  item=add_item(self.db,1,'Ay sonu','bill','Faturalar',1234,'monthly','2026-11-30')
+  dates=[row[3] for row in upcoming_items(self.db,1,date(2026,11,12),1) if row[0]==item]
+  self.assertEqual(dates,['2026-11-30','2026-12-30'])
+  self.assertEqual(summary(self.db,1)[1],0)
+
+ def test_december_and_february_month_end(self):
+  item=add_item(self.db,1,'Ayın otuz biri','subscription','Abonelik',1000,'monthly','2026-12-31')
+  dates=[row[3] for row in upcoming_items(self.db,1,date(2026,12,1),2) if row[0]==item]
+  self.assertEqual(dates,['2026-12-31','2027-01-31','2027-02-28'])
+
+ def test_invalid_amount_and_calendar_window(self):
+  for amount in (1.5,True,'100',None,0):
+   with self.subTest(amount=amount):
+    with self.assertRaises(ValueError):
+     add_item(self.db,1,'Hatalı','bill','Faturalar',amount,'monthly','2026-11-15')
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM recurring_items').fetchone()[0],0)
+  for months in (-1,0.5,True,'12',None):
+   with self.subTest(months=months):
+    with self.assertRaises(ValueError):upcoming_items(self.db,1,date(2026,11,12),months)
+
+ def test_archive_does_not_commit_outer_transaction(self):
+  item=add_item(self.db,1,'Geçici','bill','Faturalar',2500,'monthly','2026-11-15')
+  self.db.execute('BEGIN IMMEDIATE')
+  set_active(self.db,1,item,False)
+  self.assertEqual(self.db.execute('SELECT active FROM recurring_items WHERE id=?',(item,)).fetchone()[0],0)
+  self.db.rollback()
+  self.assertEqual(self.db.execute('SELECT active FROM recurring_items WHERE id=?',(item,)).fetchone()[0],1)
+
  def test_archive(self):
   item=add_item(self.db,1,'Hizmet','subscription','Abonelik',1200,'monthly','2026-11-01')
   set_active(self.db,1,item,False)
