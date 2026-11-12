@@ -24,6 +24,7 @@ from kmh_core import migrate_kmh, closing_due, set_overdraft, overdraft, use_ove
 from v04_core import month_add, cards,create_card,purchase,pay_card,upcoming,shared_history,edit_shared_split
 from finance_core import (DB_DIR, DB_PATH, money, open_db, migrate, get_profiles, add_account,
                           add_transaction, accounts_with_balances, summary, add_member, get_members, add_shared_expense, member_expenses, transfer)
+from reporting_core import monthly_trend, category_expenses
 
 
 from PySide6.QtCore import QThread, Signal
@@ -1182,26 +1183,14 @@ class App(QMainWindow):
         self.fill_table(self.calendar_table,[(iid,name,due,money(amount),status(due),note) for iid,name,due,amount,note in visible])
 
     def refresh_charts(self,pid):
-        cat_rows=self.db.execute("""SELECT category,SUM(amount_cents) FROM (
-            SELECT category,amount_cents FROM transactions WHERE profile_id=? AND kind='expense'
-            UNION ALL SELECT p.category,p.total_cents FROM card_purchases p
-            JOIN credit_cards c ON c.id=p.card_id WHERE c.profile_id=?)
-            GROUP BY category ORDER BY SUM(amount_cents) DESC,category""",(pid,pid)).fetchall()
+        cat_rows=category_expenses(self.db,pid)
         def chart_slices(rows):
             rows=list(rows)
             if len(rows)>6:
                 return rows[:5]+[('Diğer',sum(value for _,value in rows[5:]))]
             return rows
         self.category_chart.set_values(chart_slices([(str(k),v) for k,v in cat_rows]))
-        hist=self.db.execute("""SELECT month,kind,SUM(amount_cents) FROM (
-            SELECT substr(recorded_at,1,7) AS month,kind,amount_cents FROM transactions WHERE profile_id=?
-            UNION ALL SELECT substr(p.purchase_date,1,7),'expense',p.total_cents
-            FROM card_purchases p JOIN credit_cards c ON c.id=p.card_id WHERE c.profile_id=?)
-            GROUP BY month,kind ORDER BY month DESC LIMIT 24""",(pid,pid)).fetchall()
-        grouped={}
-        for month,kind,value in hist:
-            grouped.setdefault(month,[0,0])[0 if kind=='income' else 1]+=value
-        self.trend_chart.set_values([(month, vals[0],vals[1]) for month,vals in sorted(grouped.items())[-6:]])
+        self.trend_chart.set_values(monthly_trend(self.db,pid))
         accts=accounts_with_balances(self.db,pid)
         self.asset_chart.set_values(chart_slices(sorted([(name,balance) for _,name,kind,balance in accts if balance>0],key=lambda row:row[1],reverse=True)))
 
