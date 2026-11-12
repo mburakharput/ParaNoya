@@ -196,6 +196,16 @@ def migrate(path=DB_PATH):
     if path.exists():
         with closing(open_db(path)) as db, db:
             version=db.execute('PRAGMA user_version').fetchone()[0]
+            # Identify legacy ParaNoya databases before changing their schema.
+            # An unrelated SQLite file must never be converted in place.
+            tables={row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+            if tables and 'profiles' not in tables:
+                raise ValueError('Bu dosya ParaNoya veritabanı değil; kayıtlar değiştirilmedi.')
+            if 'profiles' in tables:
+                columns={row[1] for row in db.execute('PRAGMA table_info(profiles)')}
+                if not {'id','name','kind'}.issubset(columns):
+                    raise ValueError('ParaNoya profil tablosu tanınmadı; kayıtlar değiştirilmedi.')
             if version > MAX_SCHEMA_VERSION:
                 raise ValueError('Veritabanı daha yeni bir ParaNoya sürümüne ait; güncel uygulamayı kullanın.')
             if version < 4 and db.execute("SELECT 1 FROM sqlite_master WHERE name='accounts'").fetchone():
