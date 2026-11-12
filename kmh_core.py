@@ -95,7 +95,7 @@ def add_installment_loan(db, profile, od_id, principal_cents, schedule, descript
     if sum(x[1] for x in schedule)!=principal_cents:raise ValueError('Taksit anaparalarının toplamı kredi anaparasına eşit olmalı.')
     dates=[date.fromisoformat(x[0]) for x in schedule]
     if dates != sorted(set(dates)):raise ValueError('Taksit tarihleri tekil ve artan olmalı.')
-    with db:
+    with write_transaction(db):
         loan=db.execute('INSERT INTO kmh_loans(overdraft_id,principal_cents,description) VALUES(?,?,?)',(od_id,principal_cents,description)).lastrowid
         db.executemany('''INSERT INTO kmh_installments(loan_id,sequence,due_date,principal_cents,interest_cents,tax_cents,fee_cents)
           VALUES(?,?,?,?,?,?,?)''',[(loan,i+1,*line) for i,line in enumerate(schedule)])
