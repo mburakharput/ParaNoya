@@ -36,6 +36,44 @@ class CardKmhSafetyTests(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM card_purchases").fetchone()[0], 2)
         self.assertEqual(accounts_with_balances(self.db, 1)[0][3], 97000)
 
+    def test_statement_cutoff_and_month_end_installment_schedule(self):
+        # The 10th is the statement cutoff and the 20th the projected due day.
+        before = purchase(self.db, 1, self.card, "Market", "Before cutoff", 101, 2, "2026-11-05")
+        after = purchase(self.db, 1, self.card, "Market", "After cutoff", 103, 2, "2026-11-15")
+        rows = self.db.execute(
+            "SELECT p.id,i.due_date,i.amount_cents FROM card_installments i "
+            "JOIN card_purchases p ON p.id=i.purchase_id ORDER BY p.id,i.sequence"
+        ).fetchall()
+        self.assertEqual(
+            rows,
+            [(before, "2026-11-20", 51), (before, "2026-12-20", 50),
+             (after, "2026-12-20", 52), (after, "2027-01-20", 51)],
+        )
+        self.assertEqual(sum(row[2] for row in rows), 204)
+
+    def test_due_day_preceding_statement_day(self):
+        # Closing on the 25th means a due day of the 5th is in the next month.
+        create_card(self.db, 1, "Earlier due day", 25, 5, 5000)
+        card_id = self.db.execute(
+            "SELECT id FROM credit_cards WHERE name='Earlier due day'"
+        ).fetchone()[0]
+        purchase(self.db, 1, card_id, "Market", "", 200, 1, "2026-11-10")
+        self.assertEqual(
+            self.db.execute(
+                "SELECT due_date FROM card_installments WHERE purchase_id="
+                "(SELECT id FROM card_purchases WHERE card_id=?)", (card_id,)
+            ).fetchone()[0],
+            "2026-12-05",
+        )
+        purchase(self.db, 1, card_id, "Market", "", 200, 1, "2026-11-28")
+        self.assertEqual(
+            self.db.execute(
+                "SELECT due_date FROM card_installments WHERE purchase_id="
+                "(SELECT MAX(id) FROM card_purchases WHERE card_id=?)", (card_id,)
+            ).fetchone()[0],
+            "2027-01-05",
+        )
+
     def test_card_rejects_non_integer_cents_and_installments(self):
         for amount, installments in ((100.5, 1), (True, 1), (100, 1.5), (100, True)):
             with self.subTest(amount=amount, installments=installments):
