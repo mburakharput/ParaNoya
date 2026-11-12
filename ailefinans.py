@@ -578,11 +578,69 @@ class App(QMainWindow):
         self.stack.addWidget(accounts_page)
         transactions_page = QWidget()
         tx_layout = QVBoxLayout(transactions_page)
-        new_tx = QPushButton('+ Yeni gelir / gider')
+        tx_layout.setContentsMargins(18,16,18,18)
+        tx_layout.setSpacing(14)
+        tx_header=QHBoxLayout()
+        tx_intro=QVBoxLayout()
+        tx_intro.setSpacing(3)
+        tx_heading=QLabel('Gelir ve Giderleriniz')
+        tx_heading.setObjectName('sectionTitle')
+        tx_intro.addWidget(tx_heading)
+        tx_description=QLabel('Hesap hareketlerini ve kredi kartı harcamalarını tek listede görüntüleyin.')
+        tx_description.setObjectName('sectionSubtitle')
+        tx_description.setWordWrap(True)
+        tx_intro.addWidget(tx_description)
+        tx_header.addLayout(tx_intro,1)
+        new_tx = QPushButton('＋  Yeni Gelir / Gider')
+        new_tx.setObjectName('accountPrimaryAction')
+        new_tx.setMinimumHeight(43)
         new_tx.clicked.connect(self.create_transaction)
-        tx_layout.addWidget(new_tx, alignment=Qt.AlignmentFlag.AlignLeft)
+        tx_header.addWidget(new_tx,0,Qt.AlignmentFlag.AlignTop)
+        tx_layout.addLayout(tx_header)
+
+        tx_metrics=QHBoxLayout()
+        tx_metrics.setSpacing(12)
+        self.tx_income_total=QLabel('0,00 ₺')
+        self.tx_expense_total=QLabel('0,00 ₺')
+        self.tx_record_count=QLabel('0')
+        for title,value in [('TOPLAM GELİR',self.tx_income_total),
+                            ('TOPLAM GİDER',self.tx_expense_total),
+                            ('İŞLEM SAYISI',self.tx_record_count)]:
+            tile=QFrame()
+            tile.setObjectName('cardMetric')
+            inner=QVBoxLayout(tile)
+            inner.setContentsMargins(18,15,18,15)
+            inner.setSpacing(8)
+            cap=QLabel(title)
+            cap.setObjectName('metricCaption')
+            inner.addWidget(cap)
+            value.setObjectName('metricNumber')
+            inner.addWidget(value)
+            tx_metrics.addWidget(tile,1)
+        tx_layout.addLayout(tx_metrics)
+
+        tx_list_label=QLabel('İşlem Geçmişi')
+        tx_list_label.setObjectName('sectionSubheading')
+        tx_layout.addWidget(tx_list_label)
+        tx_search_row=QHBoxLayout()
+        self.tx_search_box=QLineEdit()
+        self.tx_search_box.setObjectName('transactionSearch')
+        self.tx_search_box.setPlaceholderText('Tarih, hesap, kategori veya açıklamada ara...')
+        self.tx_search_box.setClearButtonEnabled(True)
+        self.tx_search_box.textChanged.connect(self._filter_transactions)
+        tx_search_row.addWidget(self.tx_search_box,1)
+        tx_reset=QPushButton('Temizle')
+        tx_reset.setObjectName('transactionClear')
+        tx_reset.clicked.connect(self.tx_search_box.clear)
+        tx_search_row.addWidget(tx_reset)
+        tx_layout.addLayout(tx_search_row)
+
         self.tx_table = self.make_table(['Tarih', 'Tür', 'Hesap', 'Kategori', 'Açıklama', 'Tutar'])
-        tx_layout.addWidget(self.tx_table)
+        self.tx_table.setMinimumHeight(270)
+        tx_layout.addWidget(self.tx_table,1)
+        self.tx_filter_status=QLabel('')
+        self.tx_filter_status.setObjectName('sectionSubtitle')
+        tx_layout.addWidget(self.tx_filter_status)
         self.stack.addWidget(transactions_page)
         family_page = QWidget()
         fam = QVBoxLayout(family_page)
@@ -832,11 +890,29 @@ class App(QMainWindow):
 
     def global_search(self):
         term=self.search_box.text().strip()
-        if not term:return
+        if not term:
+            return
         self.select_page(2)
-        for r in range(self.tx_table.rowCount()):
-            hit=any(term.casefold() in (self.tx_table.item(r,c).text() if self.tx_table.item(r,c) else '').casefold() for c in range(self.tx_table.columnCount()))
-            self.tx_table.setRowHidden(r,not hit)
+        self.tx_search_box.setText(term)
+        self.tx_search_box.setFocus()
+
+    def _filter_transactions(self, *_):
+        """Filter the visible view, never change stored financial records."""
+        if not hasattr(self,'tx_table'):
+            return
+        term=self.tx_search_box.text().strip().casefold()
+        count=0
+        for row in range(self.tx_table.rowCount()):
+            hit=not term or any(
+                term in (self.tx_table.item(row,column).text() if self.tx_table.item(row,column) else '').casefold()
+                for column in range(self.tx_table.columnCount())
+            )
+            self.tx_table.setRowHidden(row,not hit)
+            count+=hit
+        total=self.tx_table.rowCount()
+        self.tx_filter_status.setText(
+            f'{count} / {total} işlem gösteriliyor' if term else f'{total} işlem listeleniyor'
+        )
 
     def make_card(self, grid, col, title):
         box = QFrame()
@@ -1207,6 +1283,10 @@ class App(QMainWindow):
                   ('+' if kind == 'income' else '-') + money(amt))
                  for when, kind, acct, cat, note, amt in rows]
         self.fill_table(self.tx_table, shown)
+        self.tx_income_total.setText(money(sum(amt for _,kind,_,_,_,amt in rows if kind=='income')))
+        self.tx_expense_total.setText(money(sum(amt for _,kind,_,_,_,amt in rows if kind!='income')))
+        self.tx_record_count.setText(str(len(rows)))
+        self._filter_transactions()
         self.fill_table(self.recent, [(when, typ, acct, cat, amt)
                                       for when, typ, acct, cat, note, amt in shown[:10]])
         self.fill_table(self.members_table, [(name,money(cents)) for name,cents in member_expenses(self.db)])
@@ -1952,6 +2032,9 @@ class App(QMainWindow):
             QLabel#sectionTitle {{font-size:21px;font-weight:800;color:{ink};}}
             QLabel#sectionSubtitle {{font-size:12px;color:{muted};}}
             QLabel#sectionSubheading {{font-size:15px;font-weight:800;color:{ink};padding-top:6px;}}
+            QLineEdit#transactionSearch {{min-height:25px;padding:9px 14px;}}
+            QPushButton#transactionClear {{min-height:25px;padding:9px 15px;}}
+
             QLabel#accountEmptyHint {{color:{muted};font-size:12px;padding:9px 12px;background:{card};border:1px dashed {border};border-radius:8px;}}
             QLabel#accountDetailBody {{color:{muted};font-size:12px;}}
             QPushButton#accountPrimaryAction {{background:#087f94;color:#ffffff;border:1px solid #0da1b5;font-weight:800;border-radius:10px;padding:10px 18px;}}
