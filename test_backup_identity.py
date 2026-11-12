@@ -2,6 +2,7 @@
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,7 +16,9 @@ class BackupIdentityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             foreign_db = root / "foreign.db"
-            with sqlite3.connect(foreign_db) as db:
+            # sqlite3's context manager commits/rolls back, but does not close.
+            # Close explicitly so Windows can remove the temporary database.
+            with closing(sqlite3.connect(foreign_db)) as db, db:
                 db.execute("CREATE TABLE unrelated_application (id INTEGER PRIMARY KEY)")
             payload = foreign_db.read_bytes()
             archive = root / "foreign.zip"
