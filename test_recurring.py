@@ -15,7 +15,8 @@ class TestRecurring(unittest.TestCase):
   self.assertEqual(next_occurrence('2026-11-15','yearly',1),'2027-11-15')
  def test_pay_once_no_pending_double(self):
   item=add_item(self.db,1,'Internet','bill','Faturalar',50000,'monthly','2026-11-15')
-  self.assertEqual(len(upcoming_items(self.db,1,date(2026,11,1),1)),1)
+  self.assertEqual([row[3] for row in upcoming_items(self.db,1,date(2026,11,1),1)],
+                   ['2026-11-15','2026-12-15'])
   pay_occurrence(self.db,1,item,'2026-11-15',self.acc)
   self.assertEqual(summary(self.db,1)[1],50000)
   with self.assertRaises(ValueError):pay_occurrence(self.db,1,item,'2026-11-15',self.acc)
