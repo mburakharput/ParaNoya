@@ -83,6 +83,21 @@ class CardKmhSafetyTests(unittest.TestCase):
             pay_card(self.db, 1, self.card, self.account, 1.5)
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM card_purchases").fetchone()[0], 0)
 
+    def test_kmh_loan_respects_outer_transaction_rollback(self):
+        od = set_overdraft(self.db, 1, self.account, 20000)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            loan_id = add_installment_loan(
+                self.db, 1, od, 1000, [("2026-12-10", 1000, 100, 0, 0)]
+            )
+            self.assertEqual(
+                self.db.execute("SELECT COUNT(*) FROM kmh_installments WHERE loan_id=?", (loan_id,)).fetchone()[0], 1
+            )
+        finally:
+            self.db.rollback()
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM kmh_loans").fetchone()[0], 0)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM kmh_installments").fetchone()[0], 0)
+
     def test_kmh_invalid_schedule_and_fractional_amounts(self):
         od = set_overdraft(self.db, 1, self.account, 20000)
         with self.assertRaises(ValueError):
