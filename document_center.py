@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from document_rows import preview_rows
+from write_transaction import write_transaction
 
 TYPES={'payslip':'Maaş bordrosu','invoice':'Fatura','statement':'Kredi kartı ekstresi','schedule':'Banka ödeme planı','movements':'Hesap hareketleri'}
 
@@ -102,7 +103,7 @@ def stage(db, profile, path, typ):
     if len(raw)>15*1024*1024:raise ValueError('Belge 15 MB sınırını aşıyor')
     digest=hashlib.sha256(raw).hexdigest()
     parsed=parse(extract(path),typ)
-    with db:
+    with write_transaction(db):
         existing=db.execute('SELECT id,extracted_json FROM imported_documents WHERE profile_id=? AND sha256=?',(profile,digest)).fetchone()
         if existing: return existing[0],False,json.loads(existing[1])
         cur=db.execute('INSERT INTO imported_documents(profile_id,sha256,filename,doc_type,extracted_json) VALUES(?,?,?,?,?)',(profile,digest,Path(path).name,typ,json.dumps(parsed,ensure_ascii=False)))
