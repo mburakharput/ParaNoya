@@ -31,7 +31,8 @@ def next_occurrence(start,frequency,index):
     return date(y,m,min(origin.day,calendar.monthrange(y,m)[1])).isoformat()
 
 def add_item(db,profile,name,kind,category,amount_cents,frequency,first_due):
-    if not name.strip() or kind not in KINDS or frequency not in FREQUENCIES or amount_cents<=0:
+    if (type(amount_cents) is not int or amount_cents<=0 or
+            not name.strip() or kind not in KINDS or frequency not in FREQUENCIES):
         raise ValueError('Geçersiz düzenli ödeme bilgisi')
     date.fromisoformat(first_due)
     with db:
@@ -40,17 +41,20 @@ def add_item(db,profile,name,kind,category,amount_cents,frequency,first_due):
 
 def upcoming_items(db,profile,today=None,months_ahead=12):
     today=today or date.today()
+    if type(months_ahead) is not int or months_ahead<0:
+        raise ValueError('Takvim aralığı negatif olmayan tam ay olmalı')
+    last_month=date.fromisoformat(next_occurrence(today.replace(day=1).isoformat(),'monthly',months_ahead))
+    end=last_month.replace(day=calendar.monthrange(last_month.year,last_month.month)[1])
     rows=db.execute('SELECT id,name,kind,category,amount_cents,frequency,first_due FROM recurring_items WHERE profile_id=? AND active=1',(profile,)).fetchall()
     result=[]
     for item_id,name,kind,cat,amount,freq,first in rows:
         paid_dates={r[0] for r in db.execute('SELECT due_date FROM recurring_payments WHERE item_id=?',(item_id,))}
         origin=date.fromisoformat(first)
-        end=date.fromisoformat(next_occurrence(today.replace(day=1).isoformat(),'monthly',months_ahead))
         step={'monthly':1,'quarterly':3,'yearly':12}[freq]
         count=max(0,((end.year-origin.year)*12+end.month-origin.month)//step+1)
         for i in range(count):
             due=next_occurrence(first,freq,i)
-            if due > next_occurrence(today.replace(day=1).isoformat(),'monthly',months_ahead):break
+            if due > end.isoformat():break
             if due not in paid_dates: result.append((item_id,name,kind,due,amount,cat))
     return sorted(result,key=lambda r:(r[3],r[1]))
 
@@ -75,6 +79,6 @@ def pay_occurrence(db,profile,item_id,due_date,account_id):
         return tx
 
 def set_active(db,profile,item_id,active):
-    with db:
+    with write_transaction(db):
         cur=db.execute('UPDATE recurring_items SET active=? WHERE id=? AND profile_id=?',(int(bool(active)),item_id,profile))
         if not cur.rowcount:raise ValueError('Kayıt bulunamadı')
