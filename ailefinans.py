@@ -1292,10 +1292,9 @@ class App(QMainWindow):
         """Preserve form controls at small window sizes by scrolling the content."""
         layout=page.layout()
         if layout is not None:
-            # SetMinimumSize recalculates and overwrites an explicit widget height.
-            # Keep natural layout behavior; the viewport scrolls instead.
-            layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetDefaultConstraint)
-        page.setMinimumHeight(minimum_height)
+            # Do not let Qt's layout impose its computed minimum (e.g. 396 px)
+            # over the explicit scroll-content height requested by this page.
+            layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)
         scroll=QScrollArea()
         scroll.setObjectName(object_name)
         scroll.setWidgetResizable(True)
@@ -1303,6 +1302,9 @@ class App(QMainWindow):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setWidget(page)
+        # Set the explicit height after parenting into QScrollArea: setWidget() and
+        # initial layout activation can otherwise replace an earlier minimum.
+        page.setMinimumHeight(minimum_height)
         return scroll
 
     def global_search(self):
