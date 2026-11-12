@@ -30,27 +30,12 @@ from reporting_core import monthly_trend, category_expenses
 from PySide6.QtCore import QThread, Signal
 
 def circular_mascot(path, size=60):
-    """Crop the actual raster to a circle, not just its surrounding label."""
-    density=3
-    canvas=QPixmap(size*density,size*density)
-    canvas.setDevicePixelRatio(density)
-    canvas.fill(Qt.GlobalColor.transparent)
-    painter=QPainter(canvas)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QColor('#ffffff'))
-    painter.drawEllipse(QRectF(0,0,size,size))
-    clip=QPainterPath()
-    clip.addEllipse(QRectF(3,3,size-6,size-6))
-    painter.setClipPath(clip)
-    source=QPixmap(str(path)).scaled((size-6)*density,(size-6)*density,Qt.AspectRatioMode.KeepAspectRatioByExpanding,Qt.TransformationMode.SmoothTransformation)
-    if not source.isNull():
-        width=source.width()/density;height=source.height()/density
-        painter.drawPixmap(QRectF((size-width)/2,(size-height)/2,width,height),source,QRectF(source.rect()))
-    painter.end()
-    return canvas
-
+    """Show the transparent owl asset without drawing any white badge behind it."""
+    source=QPixmap(str(path))
+    if source.isNull():
+        return QPixmap()
+    return source.scaled(size,size,Qt.AspectRatioMode.KeepAspectRatio,
+                         Qt.TransformationMode.SmoothTransformation)
 
 class LogoDownloadWorker(QThread):
     finished_result = Signal(int, int, object)
@@ -323,7 +308,10 @@ class App(QMainWindow):
         self._row_ids={'account':[], 'card':[], 'kmh':[]}
         self.dark = False
         self.setWindowTitle('ParaNoya · Paranın peşini bırakma! · v1.2.5.8')
-        self.setWindowIcon(QIcon(str(Path(__file__).parent/'assets'/'paranoya_mascot.png')))
+        icon_path=Path(__file__).parent/'assets'/'paranoya.ico'
+        if not icon_path.is_file():
+            icon_path=Path(__file__).parent/'assets'/'paranoya_mascot.png'
+        self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1440, 900)
         self.setMinimumSize(920, 600)
         central = QWidget()
@@ -1813,7 +1801,7 @@ class App(QMainWindow):
             QScrollArea#sidebarMenuScroll QScrollBar::add-line:vertical,QScrollArea#sidebarMenuScroll QScrollBar::sub-line:vertical {{height:0;}}
             QWidget#brandPanel {{background:#092d49;border:1px solid #174763;border-radius:12px;}}
             QWidget#brandPanel QLabel {{background:transparent;color:#ffffff;}}
-            QWidget#brandPanel QLabel#mascotAvatar {{background:#ffffff;border:1px solid #d6f5f3;border-radius:30px;}}
+            QWidget#brandPanel QLabel#mascotAvatar {{background:transparent;border:none;}}
             QWidget#sidebar QLabel {{color:#eefbff;background:transparent;}}
             QWidget#sidebar QPushButton {{color:#eefbff;background:#123e5c;border:1px solid #275773;}}
             QWidget#sidebar QPushButton:disabled {{color:#8daabd;background:#0b304d;border:1px solid #16415c;}}
