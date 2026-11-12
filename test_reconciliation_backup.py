@@ -2,6 +2,7 @@ from contextlib import closing
 import json,sqlite3,tempfile,unittest
 from pathlib import Path
 from backup_manager import make_backup,verify_backup
+from finance_core import migrate
 from reconciliation import statement_reconciliation, validate_schedule_preview
 
 class ReviewAndBackupTests(unittest.TestCase):
@@ -25,7 +26,8 @@ class ReviewAndBackupTests(unittest.TestCase):
  def test_backup_includes_documents(self):
   with tempfile.TemporaryDirectory() as t:
    p=Path(t)/'user';p.mkdir()
-   with closing(sqlite3.connect(p/'ailefinans.db')) as db, db:db.execute('CREATE TABLE x(a int)')
+   # Use a real ParaNoya schema; unrelated SQLite files must fail identity validation.
+   migrate(p/'ailefinans.db')
    (p/'product_documents').mkdir();(p/'product_documents'/'invoice.pdf').write_bytes(b'example')
    zip_path=Path(t)/'safe.zip';make_backup(p,zip_path)
    self.assertTrue(verify_backup(zip_path))
