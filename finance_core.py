@@ -92,6 +92,8 @@ def get_profiles(db):
 
 
 def add_account(db, profile, name, kind, opening_cents):
+    if type(opening_cents) is not int:
+        raise ValueError('Açılış bakiyesi tam kuruş olarak girilmeli.')
     name = name.strip()
     if not name or kind not in ('cash', 'bank'):
         raise ValueError('Geçerli bir hesap adı ve türü girin.')
@@ -101,6 +103,8 @@ def add_account(db, profile, name, kind, opening_cents):
 
 
 def add_transaction(db, profile, account, kind, category, description, amount_cents):
+    if type(amount_cents) is not int:
+        raise ValueError('İşlem tutarı tam kuruş olarak girilmeli.')
     if amount_cents <= 0 or kind not in ('income', 'expense') or not category.strip():
         raise ValueError('İşlem türü, kategori veya tutar geçersiz.')
     with db:
@@ -153,6 +157,8 @@ def get_members(db):
 
 
 def add_shared_expense(db, profile, account, category, description, amount_cents, allocation):
+    if type(amount_cents) is not int or not isinstance(allocation, dict) or any(type(v) is not int for v in allocation.values()):
+        raise ValueError('Ortak gider ve paylar tam kuruş olarak girilmeli.')
     # Split describes attribution only. Actual money movement occurs once, in transactions.
     if amount_cents <= 0 or not allocation or any(v < 0 for v in allocation.values()) or sum(allocation.values()) != amount_cents:
         raise ValueError('Pay toplamları gider tutarına eşit olmalı.')
@@ -178,6 +184,8 @@ def member_expenses(db):
 
 
 def transfer(db, profile, from_account, to_account, cents, note=''):
+    if type(cents) is not int:
+        raise ValueError('Transfer tutarı tam kuruş olarak girilmeli.')
     if cents <= 0 or from_account == to_account:
         raise ValueError('Pozitif tutar ve farklı iki hesap seçin.')
     with db:
