@@ -114,6 +114,40 @@ class BankVisualTests(unittest.TestCase):
         self.assertIn('recurring_scroll.setWidget(recurring_page)',source)
         self.assertIn('self.stack.addWidget(recurring_scroll)',source)
 
+    def test_content_page_scrolls_without_compressing_form_at_920x600(self):
+        """Compact Windows windows should scroll instead of squeezing page contents."""
+        from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QScrollArea
+        page=QWidget()
+        layout=QVBoxLayout(page)
+        fields=[]
+        for _ in range(8):
+            field=QLineEdit()
+            field.setMinimumHeight(42)
+            layout.addWidget(field)
+            fields.append(field)
+        scroll=App._scroll_content_page(page,'compactPageScroll',900)
+        try:
+            self.assertIsInstance(scroll,QScrollArea)
+            self.assertIs(scroll.widget(),page)
+            self.assertEqual(page.minimumHeight(),900)
+            scroll.resize(640,440)
+            scroll.show()
+            self.app.processEvents()
+            self.assertGreater(scroll.verticalScrollBar().maximum(),0)
+            self.assertTrue(all(field.height()>=42 for field in fields))
+        finally:
+            scroll.close()
+
+    def test_all_content_pages_use_scrollable_viewport(self):
+        """Page order must stay intact while long panels gain a scroll container."""
+        import inspect
+        source=inspect.getsource(App.__init__)
+        names=['accounts_page','transactions_page','family_page','transfer_page',
+               'cardpage','historypage','kmhpage','calpage','documents_page',
+               'products_page']
+        for page in names:
+            self.assertIn('self.stack.addWidget(self._scroll_content_page('+page+',',source)
+
     def test_missing_logo_detail_uses_fixed_size_fallback(self):
         from PySide6.QtWidgets import QLabel
         host=SimpleNamespace(_bank_icon=lambda name: App._bank_icon(None,name),devicePixelRatioF=lambda:2)
