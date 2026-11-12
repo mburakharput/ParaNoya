@@ -44,7 +44,8 @@ def cards(db, profile):
       FROM credit_cards c WHERE c.profile_id=? ORDER BY c.id''',(profile,)).fetchall()
 
 def create_card(db,profile,name,statement_day,due_day,limit_cents):
-    if not name.strip() or not 1<=statement_day<=31 or not 1<=due_day<=31 or limit_cents<0:
+    if (type(limit_cents) is not int or type(statement_day) is not int or type(due_day) is not int or
+            not name.strip() or not 1<=statement_day<=31 or not 1<=due_day<=31 or limit_cents<0):
         raise ValueError('Kart bilgilerini kontrol edin.')
     with db:
         db.execute('INSERT INTO credit_cards(profile_id,name,statement_day,due_day,credit_limit_cents) VALUES (?,?,?,?,?)',(profile,name.strip(),statement_day,due_day,limit_cents))
@@ -67,10 +68,16 @@ def first_due(purchase_date,statement_day,due_day):
 
 def purchase(db,profile,card_id,category,description,amount,installments,purchased=None):
     with write_transaction(db):
-        if amount<=0 or not 1<=installments<=60 or amount<installments or not category.strip():
+        if (type(amount) is not int or type(installments) is not int or
+                amount<=0 or not 1<=installments<=60 or amount<installments or not category.strip()):
             raise ValueError('Alışveriş tutarı/taksit/kategori geçersiz.')
-        row=db.execute('SELECT statement_day,due_day FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
+        row=db.execute('SELECT statement_day,due_day,credit_limit_cents FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
         if not row: raise ValueError('Kart bu çalışma alanına ait değil.')
+        outstanding=db.execute('''SELECT COALESCE(SUM(p.total_cents),0)
+            - COALESCE((SELECT SUM(cp.amount_cents) FROM card_payments cp WHERE cp.card_id=?),0)
+            FROM card_purchases p WHERE p.card_id=?''',(card_id,card_id)).fetchone()[0]
+        if outstanding+amount>row[2]:
+            raise ValueError('Alışveriş kartın kullanılabilir limitini aşıyor.')
         day=date.fromisoformat(purchased) if purchased else date.today()
         first=first_due(day,*row)
         q,r=divmod(amount,installments)
@@ -80,7 +87,7 @@ def purchase(db,profile,card_id,category,description,amount,installments,purchas
 
 def pay_card(db,profile,card_id,account_id,amount):
     with write_transaction(db):
-        if amount<=0: raise ValueError('Ödeme pozitif olmalı.')
+        if type(amount) is not int or amount<=0: raise ValueError('Ödeme pozitif tam kuruş olmalı.')
         row=db.execute('SELECT 1 FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
         acct=db.execute('SELECT 1 FROM accounts WHERE id=? AND profile_id=?',(account_id,profile)).fetchone()
         debt=db.execute('''SELECT COALESCE(SUM(p.total_cents),0)-COALESCE((SELECT SUM(amount_cents) FROM card_payments WHERE card_id=?),0) FROM card_purchases p WHERE p.card_id=?''',(card_id,card_id)).fetchone()[0]
@@ -108,7 +115,9 @@ def edit_shared_split(db,tx_id,allocation):
     row=db.execute('SELECT amount_cents FROM transactions WHERE id=? AND profile_id=2 AND kind="expense"',(tx_id,)).fetchone()
     previous=dict(db.execute('SELECT member_id,amount_cents FROM expense_splits WHERE transaction_id=?',(tx_id,)).fetchall())
     allowed={r[0] for r in db.execute('SELECT id FROM family_members WHERE active=1')}
-    if not row or not previous or not allocation or not set(allocation).issubset(allowed) or any(v<0 for v in allocation.values()) or sum(allocation.values())!=row[0]:
+    if (not row or not previous or not isinstance(allocation,dict) or not allocation or
+            not set(allocation).issubset(allowed) or any(type(v) is not int or v<0 for v in allocation.values()) or
+            sum(allocation.values())!=row[0]):
         raise ValueError('Paylaşım geçersiz: payların toplamı gider tutarına eşit olmalı.')
     with db:
         db.execute('DELETE FROM expense_splits WHERE transaction_id=?',(tx_id,))
