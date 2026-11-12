@@ -426,34 +426,56 @@ class App(QMainWindow):
         self.notice.setWordWrap(True)
         content.addWidget(self.notice)
         self.dashboard=QWidget()
-        self.dashboard.setMinimumSize(1100,650)
-        dash=QVBoxLayout(self.dashboard);dash.setSpacing(14)
-        overview=QGridLayout();overview.setSpacing(10)
+        # Keep the dashboard usable on smaller Windows displays; scroll vertically.
+        self.dashboard.setMinimumWidth(720)
+        dash=QVBoxLayout(self.dashboard)
+        dash.setContentsMargins(18,18,18,18)
+        dash.setSpacing(16)
+        welcome=QLabel('Finansal Genel Bakış')
+        welcome.setObjectName('dashboardTitle')
+        dash.addWidget(welcome)
+        dashboard_intro=QLabel('Hesaplarınız, kart borçlarınız ve finans hareketleriniz tek ekranda.')
+        dashboard_intro.setObjectName('dashboardSubtitle')
+        dashboard_intro.setWordWrap(True)
+        dash.addWidget(dashboard_intro)
+        overview=QGridLayout();overview.setSpacing(12)
         self.balance_value=self.make_card(overview,0,'◈  Hesap Bakiyesi')
         self.debt_value=self.make_card(overview,1,'▣  Toplam Kart Borcu')
         self.income_value=self.make_card(overview,2,'↗  Toplam Gelir')
         self.expense_value=self.make_card(overview,3,'↘  Toplam Gider')
         self.remaining_value=self.make_card(overview,4,'◎  Gelir - Gider Farkı')
+        for column in range(3):overview.setColumnStretch(column,1)
         dash.addLayout(overview)
-        middle=QHBoxLayout();middle.setSpacing(12)
-        from PySide6.QtWidgets import QSizePolicy
+        quick_box=QGroupBox('Hızlı İşlemler')
+        quick_box.setObjectName('quickActions')
+        quick=QHBoxLayout(quick_box)
+        quick.setSpacing(10)
+        for lbl,cb in [('＋  İşlem Ekle',self.create_transaction),('⇄  Transfer',self.create_transfer),('▧  Ekstre Yükle',self.import_document),('▣  Kart Ekle',self.new_card)]:
+            b=QPushButton(lbl)
+            b.setMinimumHeight(42)
+            b.clicked.connect(cb)
+            quick.addWidget(b,1)
+        dash.addWidget(quick_box)
+        middle=QGridLayout();middle.setSpacing(12)
         self.category_chart=FinanceBars('Giderlerin Kategori Dağılımı')
         self.trend_chart=FinanceBars('Aylık Gelir - Gider Trendi','trend')
         self.asset_chart=FinanceBars('Pozitif Hesap Bakiyeleri')
-        middle.addWidget(self.category_chart,2);middle.addWidget(self.trend_chart,2);middle.addWidget(self.asset_chart,2)
-        dash.addLayout(middle,2)
+        middle.addWidget(self.trend_chart,0,0,1,2)
+        middle.addWidget(self.category_chart,1,0)
+        middle.addWidget(self.asset_chart,1,1)
+        middle.setColumnStretch(0,1)
+        middle.setColumnStretch(1,1)
+        dash.addLayout(middle)
         bottom=QHBoxLayout();bottom.setSpacing(12)
         recent_box=QGroupBox('Son İşlemler');recent_layout=QVBoxLayout(recent_box)
         self.recent=self.make_table(['Tarih','Tür','Hesap','Kategori','Tutar']);recent_layout.addWidget(self.recent)
+        self.recent.setMinimumHeight(220)
         bottom.addWidget(recent_box,3)
         due_box=QGroupBox('Yaklaşan Ödemeler');due_layout=QVBoxLayout(due_box)
         self.dashboard_due=self.make_table(['Vade','Kart / Hesap','Tutar'])
+        self.dashboard_due.setMinimumHeight(220)
         due_layout.addWidget(self.dashboard_due);bottom.addWidget(due_box,2)
-        quick_box=QGroupBox('Hızlı İşlemler');quick_box.setObjectName('quickActions');quick=QVBoxLayout(quick_box)
-        for lbl,cb in [('＋  İşlem Ekle',self.create_transaction),('⇄  Transfer',self.create_transfer),('▧  Ekstre Yükle',self.import_document),('▣  Kart Ekle',self.new_card)]:
-            b=QPushButton(lbl);b.clicked.connect(cb);quick.addWidget(b)
-        quick.addStretch();bottom.addWidget(quick_box,1)
-        dash.addLayout(bottom,3)
+        dash.addLayout(bottom)
         dashboard_scroll=QScrollArea()
         dashboard_scroll.setWidgetResizable(True)
         dashboard_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -703,7 +725,7 @@ class App(QMainWindow):
         footnote.setObjectName('overviewNote')
         footnote.setWordWrap(True)
         layout.addWidget(footnote)
-        grid.addWidget(box, 0, col)
+        grid.addWidget(box, col // 3, col % 3)
         return value
 
     def make_table(self, headings):
@@ -1813,6 +1835,8 @@ class App(QMainWindow):
             QLineEdit#globalSearch {{border-radius:16px;padding:12px 18px;background:{surface};}}
             QLabel#slogan {{color:#d9f5f6;font-size:10px;font-style:italic;}}
             QLabel#heading {{font-size:27px;font-weight:800;}}
+            QLabel#dashboardTitle {{font-size:22px;font-weight:800;color:{ink};}}
+            QLabel#dashboardSubtitle {{font-size:12px;color:{muted};}}
             QLabel#stat {{font-size:24px;font-weight:800;background:transparent;color:{ink};}}
             QFrame#overviewCard {{background:{card};border:1px solid {border};border-top:4px solid #19c8bc;border-radius:15px;}}
             QFrame#overviewCard[tone='rose'] {{border-top-color:#fb6685;}}
