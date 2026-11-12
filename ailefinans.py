@@ -588,7 +588,7 @@ class App(QMainWindow):
         ad.addWidget(self.account_detail_body)
         ac_layout.addWidget(self.account_details)
         self.acc_table.itemSelectionChanged.connect(self.update_account_details)
-        self.stack.addWidget(accounts_page)
+        self.stack.addWidget(self._scroll_content_page(accounts_page,'accountsScroll',700))
         transactions_page = QWidget()
         tx_layout = QVBoxLayout(transactions_page)
         tx_layout.setContentsMargins(18,16,18,18)
@@ -654,7 +654,7 @@ class App(QMainWindow):
         self.tx_filter_status=QLabel('')
         self.tx_filter_status.setObjectName('sectionSubtitle')
         tx_layout.addWidget(self.tx_filter_status)
-        self.stack.addWidget(transactions_page)
+        self.stack.addWidget(self._scroll_content_page(transactions_page,'transactionsScroll',620))
         family_page = QWidget()
         fam = QVBoxLayout(family_page)
         fam.setContentsMargins(18,16,18,18)
@@ -696,7 +696,7 @@ class App(QMainWindow):
         self.family_empty_hint.setObjectName('accountEmptyHint')
         self.family_empty_hint.setWordWrap(True)
         fam.addWidget(self.family_empty_hint)
-        self.stack.addWidget(family_page)
+        self.stack.addWidget(self._scroll_content_page(family_page,'familyScroll',570))
         transfer_page = QWidget()
         tl=QVBoxLayout(transfer_page)
         tl.setContentsMargins(18,16,18,18)
@@ -728,7 +728,7 @@ class App(QMainWindow):
         self.transfers_empty_hint.setObjectName('accountEmptyHint')
         self.transfers_empty_hint.setWordWrap(True)
         tl.addWidget(self.transfers_empty_hint)
-        self.stack.addWidget(transfer_page)
+        self.stack.addWidget(self._scroll_content_page(transfer_page,'transferScroll',530))
         cardpage=QWidget()
         cl=QVBoxLayout(cardpage)
         cl.setContentsMargins(18,16,18,18)
@@ -829,7 +829,7 @@ class App(QMainWindow):
         self.due_table=self.make_table(['Kart','Vade','Ödenmemiş tutar','Kategori','Açıklama'])
         self.due_table.setMinimumHeight(175)
         cl.addWidget(self.due_table,1)
-        self.stack.addWidget(cardpage)
+        self.stack.addWidget(self._scroll_content_page(cardpage,'cardsScroll',940))
         historypage=QWidget()
         hl=QVBoxLayout(historypage)
         hl.setContentsMargins(18,16,18,18)
@@ -864,7 +864,7 @@ class App(QMainWindow):
         shared_info=QLabel('Pay düzeltmesi toplam gider tutarını değiştirmez.')
         shared_info.setObjectName('sectionSubtitle')
         hl.addWidget(shared_info)
-        self.stack.addWidget(historypage)
+        self.stack.addWidget(self._scroll_content_page(historypage,'sharedHistoryScroll',530))
         kmhpage=QWidget()
         kl=QVBoxLayout(kmhpage)
         kl.setContentsMargins(18,16,18,18)
@@ -958,7 +958,7 @@ class App(QMainWindow):
         kmh_note.setObjectName('sectionSubtitle')
         kmh_note.setWordWrap(True)
         kl.addWidget(kmh_note)
-        self.stack.addWidget(kmhpage)
+        self.stack.addWidget(self._scroll_content_page(kmhpage,'overdraftScroll',880))
         calpage=QWidget()
         cal=QVBoxLayout(calpage)
         cal.setContentsMargins(18,16,18,18)
@@ -1040,7 +1040,7 @@ class App(QMainWindow):
         self.calendar_recurring_empty_hint.setObjectName('accountEmptyHint')
         self.calendar_recurring_empty_hint.setWordWrap(True)
         cal.addWidget(self.calendar_recurring_empty_hint)
-        self.stack.addWidget(calpage)
+        self.stack.addWidget(self._scroll_content_page(calpage,'paymentsScroll',860))
         documents_page=QWidget()
         dv=QVBoxLayout(documents_page)
         dv.setContentsMargins(18,16,18,18)
@@ -1118,7 +1118,7 @@ class App(QMainWindow):
         salary.clicked.connect(self.post_document_entry)
         post_actions.addWidget(salary)
         dv.addLayout(post_actions)
-        self.stack.addWidget(documents_page)
+        self.stack.addWidget(self._scroll_content_page(documents_page,'documentsScroll',940))
         # Düzenli fatura ve abonelik modülü: tüm seçimler içerik alanındadır.
         recurring_page=QWidget()
         recurring_layout=QVBoxLayout(recurring_page)
@@ -1276,7 +1276,7 @@ class App(QMainWindow):
         self.products_note=QLabel('')
         self.products_note.setObjectName('sectionSubtitle')
         pv.addWidget(self.products_note)
-        self.stack.addWidget(products_page)
+        self.stack.addWidget(self._scroll_content_page(products_page,'productsScroll',700))
 
         self.dashboard_info=QLabel('');self.dashboard_info.setObjectName('dashboardFoot');dash.addWidget(self.dashboard_info)
         content.addWidget(self.stack, 1)
@@ -1286,6 +1286,22 @@ class App(QMainWindow):
         # Arayüz hazır olduğunda eksik logoları asenkron indir.
         from PySide6.QtCore import QTimer
         QTimer.singleShot(250, self.download_bank_logos)
+
+    @staticmethod
+    def _scroll_content_page(page, object_name, minimum_height):
+        """Preserve form controls at small window sizes by scrolling the content."""
+        page.setMinimumHeight(minimum_height)
+        layout=page.layout()
+        if layout is not None:
+            layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetMinimumSize)
+        scroll=QScrollArea()
+        scroll.setObjectName(object_name)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(page)
+        return scroll
 
     def global_search(self):
         term=self.search_box.text().strip()
