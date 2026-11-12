@@ -63,8 +63,25 @@ class FinanceBars(QWidget):
         p.drawText(18,31,self.heading)
         items=self.values[:6]
         if not items or all(sum(max(0,float(x)) for x in item[1:])<=0 for item in items):
-            p.setPen(QColor('#8192a5'));font.setBold(False);font.setPointSize(10);p.setFont(font)
-            p.drawText(r.adjusted(15,40,-15,-10),Qt.AlignmentFlag.AlignCenter,'Bu dönem için veri yok')
+            # Explicit empty-state guidance, readable in both themes.
+            text_color=QColor('#c6d8e5' if dark else '#446078')
+            sub_color=QColor('#9eb8ca' if dark else '#738b9e')
+            center_x=self.width()/2
+            top=max(60,self.height()/2-45)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor('#20435a' if dark else '#e5f1f7'))
+            p.drawEllipse(QRectF(center_x-22,top,44,44))
+            p.setPen(QPen(QColor('#5bd5c4' if dark else '#198fa2'),2))
+            p.drawLine(int(center_x-11),int(top+28),int(center_x-3),int(top+20))
+            p.drawLine(int(center_x-3),int(top+20),int(center_x+4),int(top+25))
+            p.drawLine(int(center_x+4),int(top+25),int(center_x+12),int(top+14))
+            p.setPen(text_color)
+            font.setPointSize(10);font.setBold(True);p.setFont(font)
+            p.drawText(QRectF(15,top+51,self.width()-30,23),Qt.AlignmentFlag.AlignCenter,'Henüz görüntülenecek veri yok')
+            p.setPen(sub_color);font.setPointSize(9);font.setBold(False);p.setFont(font)
+            hint=('İlk gelir veya gider kaydınızla trend oluşur' if self.kind=='trend'
+                  else 'Kayıt ekledikçe burada dağılımı göreceksiniz')
+            p.drawText(QRectF(12,top+75,self.width()-24,30),Qt.AlignmentFlag.AlignCenter,hint)
             return
         if self.kind=='trend':
             self._trend(p,items)
@@ -359,11 +376,11 @@ class App(QMainWindow):
         self.nav_buttons = []
         # Navigation order is independent from the QStackedWidget page indices.
         nav_groups = [
-            ('GENEL', [(0, '⌂  Genel Bakış')]),
-            ('GÜNLÜK FİNANS', [(1, '▣  Banka Hesapları'), (2, '◉  Gelir / Gider'), (4, '⇄  Transferler')]),
-            ('BORÇLAR VE ÖDEMELER', [(5, '▤  Kredi Kartları'), (7, '₺  Ek Hesap / KMH'), (8, '▦  Aylık Ödemeler'), (10, '↻  Faturalar / Abonelikler')]),
-            ('AİLE', [(3, '♧  Aile Paylaşımı'), (6, '▥  Ortak Gider Geçmişi')]),
-            ('BELGELER VE DİĞER', [(9, '▧  Akıllı Belge Merkezi'), (11, '▣  Ürünler / Garantiler')]),
+            ('GENEL', [(0, 'Genel Bakış')]),
+            ('GÜNLÜK FİNANS', [(1, 'Banka Hesapları'), (2, 'Gelir / Gider'), (4, 'Transferler')]),
+            ('BORÇLAR VE ÖDEMELER', [(5, 'Kredi Kartları'), (7, 'Ek Hesap / KMH'), (8, 'Aylık Ödemeler'), (10, 'Faturalar / Abonelikler')]),
+            ('AİLE', [(3, 'Aile Paylaşımı'), (6, 'Ortak Gider Geçmişi')]),
+            ('BELGELER VE DİĞER', [(9, 'Akıllı Belge Merkezi'), (11, 'Ürünler / Garantiler')]),
         ]
         self.nav_map = {}
         for group, entries in nav_groups:
@@ -373,6 +390,9 @@ class App(QMainWindow):
             for page_index, label in entries:
                 btn = QPushButton(label)
                 btn.setProperty('nav', True)
+                btn.setProperty('active', False)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.setToolTip(self.page_titles[page_index])
                 btn.clicked.connect(lambda _=False, i=page_index: self.select_page(i))
                 self.nav_map[page_index] = btn
                 menu_layout.addWidget(btn)
@@ -1815,8 +1835,11 @@ class App(QMainWindow):
             QPushButton {{background:{surface};border:1px solid {border};padding:10px 14px;border-radius:9px;font-weight:600;}}
             QPushButton:hover {{background:#087f94;color:white;}}
             QPushButton:disabled {{color:#8298a9;}}
-            QPushButton[nav='true'] {{text-align:left;padding:9px 12px;background:transparent;border:0;border-radius:10px;min-height:21px;}}
-            QPushButton[nav='true']:hover {{background:#066e85;}}
+            QPushButton[nav='true'] {{text-align:left;padding:10px 14px;background:transparent;border:1px solid transparent;border-radius:9px;min-height:22px;color:#dceef7;font-weight:600;}}
+            QPushButton[nav='true']:hover {{background:#164967;border-color:#28647e;}}
+            QPushButton[nav='true'][active='true'] {{background:#087f98;border-color:#16a8bb;color:#ffffff;font-weight:800;}}
+            QPushButton[nav='true'][active='true']:hover {{background:#0791aa;}}
+            QPushButton[nav='true']:focus {{border-color:#6fe2e6;}}
             QComboBox,QLineEdit,QDoubleSpinBox,QDateEdit {{background:{surface};border:1px solid {border};border-radius:9px;padding:9px;}}
             QComboBox::drop-down, QDateEdit::drop-down {{subcontrol-origin:padding;subcontrol-position:top right;width:33px;border:0;border-left:1px solid {border};border-top-right-radius:9px;border-bottom-right-radius:9px;}}
             QComboBox::down-arrow, QDateEdit::down-arrow {{image:url(\"{(Path(__file__).resolve().parent / 'assets' / 'chevron-down.svg').as_posix()}\");width:14px;height:14px;}}
@@ -1871,8 +1894,14 @@ class App(QMainWindow):
         self._mark_active_nav()
 
     def _mark_active_nav(self):
-        for page_index,b in self.nav_map.items():
-            b.setStyleSheet('background:#008da5;color:#ffffff;font-weight:700;' if page_index==self.stack.currentIndex() else 'background:transparent;color:#f0f9ff;border:0;')
+        selected=self.stack.currentIndex()
+        for page_index,button in self.nav_map.items():
+            active=page_index==selected
+            if button.property('active') != active:
+                button.setProperty('active',active)
+                button.style().unpolish(button)
+                button.style().polish(button)
+                button.update()
 
     def closeEvent(self, event):
         controller=getattr(self,'update_controller',None)
