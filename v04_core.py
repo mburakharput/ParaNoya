@@ -60,11 +60,17 @@ def due_in_month(origin, offset, due_day):
 
 
 def first_due(purchase_date,statement_day,due_day):
-    # Simple projected schedule: the first payment due date is the first 'due_day' strictly after purchase.
-    # Not bank-specific; statements can differ. UI labels it an estimated schedule.
-    d=date(purchase_date.year,purchase_date.month,min(due_day,calendar.monthrange(purchase_date.year,purchase_date.month)[1]))
-    if d<=purchase_date: d=due_in_month(purchase_date,1,due_day)
-    return d
+    # Estimated dates only: bank-specific holidays and statement rules may differ.
+    # A purchase after this month's statement cutoff belongs to the next cycle.
+    closing_day=min(statement_day,calendar.monthrange(purchase_date.year,purchase_date.month)[1])
+    closing=purchase_date.replace(day=closing_day)
+    if purchase_date>closing:
+        closing=month_add(closing,1)
+        closing=closing.replace(day=min(statement_day,calendar.monthrange(closing.year,closing.month)[1]))
+    due=date(closing.year,closing.month,min(due_day,calendar.monthrange(closing.year,closing.month)[1]))
+    if due<=closing:
+        due=due_in_month(closing,1,due_day)
+    return due
 
 def purchase(db,profile,card_id,category,description,amount,installments,purchased=None):
     with write_transaction(db):
