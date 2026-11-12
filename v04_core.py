@@ -79,7 +79,7 @@ def purchase(db,profile,card_id,category,description,amount,installments,purchas
         if outstanding+amount>row[2]:
             raise ValueError('Alışveriş kartın kullanılabilir limitini aşıyor.')
         day=date.fromisoformat(purchased) if purchased else date.today()
-        first=first_due(day,*row)
+        first=first_due(day,row[0],row[1])
         q,r=divmod(amount,installments)
         cursor=db.execute('INSERT INTO card_purchases(card_id,category,description,total_cents,installments,purchase_date) VALUES (?,?,?,?,?,?)',(card_id,category.strip(),description.strip(),amount,installments,day.isoformat()))
         db.executemany('INSERT INTO card_installments(purchase_id,sequence,due_date,amount_cents) VALUES (?,?,?,?)',[(cursor.lastrowid,i+1,due_in_month(first,i,row[1]).isoformat(),q+(1 if i<r else 0)) for i in range(installments)])
