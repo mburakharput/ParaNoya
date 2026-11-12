@@ -75,13 +75,33 @@ class BankVisualTests(unittest.TestCase):
                 self.assertLessEqual(pix.height()/pix.devicePixelRatio(),24)
                 self.assertFalse(pix.isNull())
 
-    def test_mascot_image_is_circular_with_white_rim(self):
+    def test_mascot_image_keeps_transparency_without_white_rim(self):
+        from PySide6.QtGui import QColor, QImage, QPainter
+        from PySide6.QtCore import Qt
         from ailefinans import circular_mascot
-        image=circular_mascot(Path(__file__).parent/'assets'/'paranoya_mascot.png').toImage()
-        self.assertEqual(image.pixelColor(0,0).alpha(),0)
-        self.assertEqual(image.pixelColor(image.width()-1,0).alpha(),0)
-        self.assertEqual(image.pixelColor(image.width()//2,4).name(),'#ffffff')
-        self.assertGreater(image.pixelColor(image.width()//2,image.height()//2).alpha(),200)
+        # A generated transparent circular asset must not gain a white backdrop.
+        with tempfile.TemporaryDirectory() as folder:
+            icon_path=Path(folder)/'transparent-owl-sample.png'
+            source=QImage(60,60,QImage.Format.Format_ARGB32)
+            source.fill(Qt.GlobalColor.transparent)
+            painter=QPainter(source)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor('#008e9f'))
+            painter.drawEllipse(3,3,54,54)
+            painter.end()
+            self.assertTrue(source.save(str(icon_path)))
+            image=circular_mascot(icon_path).toImage()
+            self.assertFalse(image.isNull())
+            self.assertEqual(image.pixelColor(0,0).alpha(),0)
+            self.assertEqual(image.pixelColor(image.width()-1,0).alpha(),0)
+            self.assertEqual(image.pixelColor(image.width()//2,4).name(),'#008e9f')
+            self.assertGreater(image.pixelColor(image.width()//2,image.height()//2).alpha(),200)
+        # The bundled real owl must also load successfully.
+        owl=circular_mascot(Path(__file__).parent/'assets'/'paranoya_mascot.png').toImage()
+        self.assertFalse(owl.isNull())
+        self.assertEqual(owl.pixelColor(0,0).alpha(),0)
+        self.assertGreater(owl.pixelColor(owl.width()//2,owl.height()//2).alpha(),200)
 
     def test_missing_logo_detail_uses_fixed_size_fallback(self):
         from PySide6.QtWidgets import QLabel
