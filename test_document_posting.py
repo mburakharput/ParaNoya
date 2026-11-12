@@ -70,6 +70,13 @@ class DocumentPostingTests(unittest.TestCase):
         self.post(did,card_id=1,source_line=2,cents=5000,description='Kitap',day='2026-10-30')
         self.assertEqual(self.db.execute('SELECT status FROM imported_documents WHERE id=?',(did,)).fetchone()[0],'posted')
 
+    def test_stage_respects_outer_transaction_rollback(self):
+        self.db.execute('BEGIN IMMEDIATE')
+        did=self.stage_text('Genel Toplam: 125,00','invoice','staged-in-transaction.txt')
+        self.assertIsNotNone(self.db.execute('SELECT id FROM imported_documents WHERE id=?',(did,)).fetchone())
+        self.db.rollback()
+        self.assertIsNone(self.db.execute('SELECT id FROM imported_documents WHERE id=?',(did,)).fetchone())
+
     def test_statement_rejects_modified_amount_and_date(self):
         did=self.stage_text('29.10.2026;Market;125,00','statement')
         for kwargs in ({'cents':12501}, {'day':'2026-10-30'}):
