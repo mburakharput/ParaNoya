@@ -496,32 +496,79 @@ class App(QMainWindow):
         self.stack.addWidget(dashboard_scroll)
         accounts_page = QWidget()
         ac_layout = QVBoxLayout(accounts_page)
-        new_acc = QPushButton('+ Yeni hesap')
+        ac_layout.setContentsMargins(18,16,18,18)
+        ac_layout.setSpacing(14)
+        account_header = QHBoxLayout()
+        account_header.setSpacing(12)
+        account_intro = QVBoxLayout()
+        account_intro.setSpacing(3)
+        account_title = QLabel('Hesaplarınız')
+        account_title.setObjectName('sectionTitle')
+        account_intro.addWidget(account_title)
+        account_description = QLabel('Banka ve nakit hesaplarınızı, bakiyelerinizi ve bağlı ek hesap bilgilerinizi görüntüleyin.')
+        account_description.setObjectName('sectionSubtitle')
+        account_description.setWordWrap(True)
+        account_intro.addWidget(account_description)
+        account_header.addLayout(account_intro,1)
+        new_acc = QPushButton('＋  Yeni Hesap')
+        new_acc.setObjectName('accountPrimaryAction')
+        new_acc.setMinimumHeight(43)
         new_acc.clicked.connect(self.create_account)
-        ac_layout.addWidget(new_acc, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.acc_table = self.make_table(['Hesap', 'Tür', 'Bakiye'])
-        self._add_actions(ac_layout, self.acc_table, 'account')
+        account_header.addWidget(new_acc,0,Qt.AlignmentFlag.AlignTop)
+        ac_layout.addLayout(account_header)
+
         account_metrics=QHBoxLayout()
+        account_metrics.setSpacing(12)
         self.acc_total_count=QLabel('0')
-        self.acc_total_balance=QLabel('₺0,00')
-        self.acc_positive_balance=QLabel('₺0,00')
-        for caption, value in [('HESAP SAYISI',self.acc_total_count), ('TOPLAM HESAP BAKİYESİ',self.acc_total_balance), ('POZİTİF BAKİYELER',self.acc_positive_balance)]:
-            tile=QFrame();tile.setObjectName('cardMetric');v=QVBoxLayout(tile)
-            title=QLabel(caption);title.setObjectName('metricCaption');v.addWidget(title)
-            value.setObjectName('metricNumber');v.addWidget(value)
-            account_metrics.addWidget(tile)
-        ac_layout.insertLayout(1,account_metrics)
-        ac_layout.addWidget(self.acc_table)
-        self.account_details=QFrame();self.account_details.setObjectName('cardDetails')
+        self.acc_total_balance=QLabel('0,00 ₺')
+        self.acc_positive_balance=QLabel('0,00 ₺')
+        for caption, value in [('TOPLAM HESAP',self.acc_total_count),
+                               ('NET HESAP BAKİYESİ',self.acc_total_balance),
+                               ('POZİTİF BAKİYELER',self.acc_positive_balance)]:
+            tile=QFrame()
+            tile.setObjectName('cardMetric')
+            v=QVBoxLayout(tile)
+            v.setContentsMargins(18,15,18,15)
+            v.setSpacing(8)
+            title=QLabel(caption)
+            title.setObjectName('metricCaption')
+            v.addWidget(title)
+            value.setObjectName('metricNumber')
+            v.addWidget(value)
+            account_metrics.addWidget(tile,1)
+        ac_layout.addLayout(account_metrics)
+
+        account_list_title=QLabel('Hesap Listesi')
+        account_list_title.setObjectName('sectionSubheading')
+        ac_layout.addWidget(account_list_title)
+        self.acc_table = self.make_table(['Hesap', 'Tür', 'Bakiye'])
+        self.acc_table.setMinimumHeight(230)
+        self.acc_table.setSortingEnabled(False)
+        self._add_actions(ac_layout, self.acc_table, 'account')
+        ac_layout.addWidget(self.acc_table,1)
+        self.acc_empty_hint=QLabel('Henüz hesap eklenmedi. Başlamak için “Yeni Hesap” düğmesini kullanın.')
+        self.acc_empty_hint.setObjectName('accountEmptyHint')
+        self.acc_empty_hint.setWordWrap(True)
+        ac_layout.addWidget(self.acc_empty_hint)
+
+        self.account_details=QFrame()
+        self.account_details.setObjectName('cardDetails')
         ad=QVBoxLayout(self.account_details)
+        ad.setContentsMargins(18,15,18,16)
+        ad.setSpacing(9)
+        account_details_title=QLabel('SEÇİLİ HESAP')
+        account_details_title.setObjectName('metricCaption')
+        ad.addWidget(account_details_title)
         self.account_detail_heading=QLabel('Bir hesap seçerek ayrıntılarını görüntüleyin')
         self.account_detail_heading.setObjectName('cardDetailHeading')
         self.account_detail_body=QLabel('Hesap türü, bakiye ve bağlı KMH bilgileri burada görünür.')
+        self.account_detail_body.setObjectName('accountDetailBody')
         self.account_detail_body.setWordWrap(True)
         self.account_logo=QLabel()
         self.account_logo.setFixedHeight(34)
         self.account_logo.hide()
         logo_row=QHBoxLayout()
+        logo_row.setSpacing(12)
         logo_row.addWidget(self.account_logo)
         logo_row.addWidget(self.account_detail_heading, 1)
         ad.addLayout(logo_row)
@@ -1077,6 +1124,7 @@ class App(QMainWindow):
         self.acc_total_count.setText(str(len(accs)))
         self.acc_total_balance.setText(money(sum(a[3] for a in accs)))
         self.acc_positive_balance.setText(money(sum(max(0,a[3]) for a in accs)))
+        self.acc_empty_hint.setVisible(not bool(accs))
         self._selection_changed('account')
         self.update_account_details()
         rows = self.db.execute('''SELECT * FROM (SELECT t.recorded_at AS happened,t.kind,a.name,t.category,t.description,t.amount_cents
@@ -1827,6 +1875,13 @@ class App(QMainWindow):
             QWidget#sidebar QPushButton:disabled {{color:#8daabd;background:#0b304d;border:1px solid #16415c;}}
             QWidget#sidebar QComboBox {{color:#eefbff;background:#123e5c;}}
             QFrame#cardMetric, QFrame#cardDetails {{background:{card};border:1px solid {border};border-radius:14px;}}
+            QLabel#sectionTitle {{font-size:21px;font-weight:800;color:{ink};}}
+            QLabel#sectionSubtitle {{font-size:12px;color:{muted};}}
+            QLabel#sectionSubheading {{font-size:15px;font-weight:800;color:{ink};padding-top:6px;}}
+            QLabel#accountEmptyHint {{color:{muted};font-size:12px;padding:9px 12px;background:{card};border:1px dashed {border};border-radius:8px;}}
+            QLabel#accountDetailBody {{color:{muted};font-size:12px;}}
+            QPushButton#accountPrimaryAction {{background:#087f94;color:#ffffff;border:1px solid #0da1b5;font-weight:800;border-radius:10px;padding:10px 18px;}}
+            QPushButton#accountPrimaryAction:hover {{background:#0b9db3;}}
             QLabel#metricCaption {{color:{muted};font-weight:700;font-size:11px;}}
             QLabel#metricNumber {{font-size:23px;font-weight:800;color:{ink};}}
             QLabel#cardDetailHeading {{font-size:16px;font-weight:800;color:{ink};}}
