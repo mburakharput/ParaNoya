@@ -444,7 +444,7 @@ class App(QMainWindow):
         self.income_value=self.make_card(overview,2,'↗  Toplam Gelir')
         self.expense_value=self.make_card(overview,3,'↘  Toplam Gider')
         self.remaining_value=self.make_card(overview,4,'◎  Gelir - Gider Farkı')
-        for column in range(3):overview.setColumnStretch(column,1)
+        for column in range(6):overview.setColumnStretch(column,1)
         dash.addLayout(overview)
         quick_box=QGroupBox('Hızlı İşlemler')
         quick_box.setObjectName('quickActions')
@@ -725,7 +725,11 @@ class App(QMainWindow):
         footnote.setObjectName('overviewNote')
         footnote.setWordWrap(True)
         layout.addWidget(footnote)
-        grid.addWidget(box, col // 3, col % 3)
+        # Three equal cards above two wider cards; no unused right-hand gap.
+        if col < 3:
+            grid.addWidget(box,0,col*2,1,2)
+        else:
+            grid.addWidget(box,1,(col-3)*3,1,3)
         return value
 
     def make_table(self, headings):
