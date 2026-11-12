@@ -435,7 +435,7 @@ class App(QMainWindow):
         content.addWidget(self.notice)
         self.dashboard=QWidget()
         # Keep the dashboard usable on smaller Windows displays; scroll vertically.
-        self.dashboard.setMinimumWidth(720)
+        self.dashboard.setMinimumWidth(600)
         dash=QVBoxLayout(self.dashboard)
         dash.setContentsMargins(12,8,12,14)
         dash.setSpacing(13)
