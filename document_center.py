@@ -146,11 +146,13 @@ def approve_document_entry(db, profile, doc_id, *, account_id=None, card_id=None
             candidate=next((x for x in parsed.get('candidates',[]) if x.get('source_line')==source_line),None)
             if not candidate or candidate['amount_cents']<=0:
                 raise ValueError('Pozitif alışveriş satırı seçin; ödeme ve iadeler ayrı işlenmeli')
+            if candidate['amount_cents']!=cents or candidate['date']!=day:
+                raise ValueError('Onaylanan tutar ve tarih belge satırıyla eşleşmiyor')
             if re.search(r'ödeme|iade|devir|devreden|önceki\s+dönem',candidate['description'],re.I):
                 raise ValueError('Ödeme, iade ve devreden borç alışveriş olarak aktarılamaz')
             if re.search(r'taksit|installment|\b\d+\s*/\s*\d+\b',candidate['description'],re.I):
                 raise ValueError('Ekstre taksitini yeni alışveriş gibi eklemeyin; mevcut taksit planıyla karşılaştırın')
-            card=db.execute('SELECT statement_day,due_day FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
+            card=db.execute('SELECT statement_day,due_day,credit_limit_cents FROM credit_cards WHERE id=? AND profile_id=?',(card_id,profile)).fetchone()
             if not card:raise ValueError('Kart bu profile ait değil')
             # A matching date+amount is ambiguous: link only if description also agrees.
             matches=db.execute('SELECT id,description FROM card_purchases WHERE card_id=? AND purchase_date=? AND total_cents=?',(card_id,day,cents)).fetchall()
@@ -158,9 +160,15 @@ def approve_document_entry(db, profile, doc_id, *, account_id=None, card_id=None
             if matches and len(exact)!=1:raise ValueError('Aynı tarih/tutarda alışveriş var; önce mevcut kayıtla karşılaştırın')
             if exact:purchase_id=exact[0];created=False
             else:
+                # Posting via document approval must enforce the same limit as manual purchases.
+                outstanding=db.execute('''SELECT COALESCE(SUM(p.total_cents),0)
+                    - COALESCE((SELECT SUM(pay.amount_cents) FROM card_payments pay WHERE pay.card_id=?),0)
+                    FROM card_purchases p WHERE p.card_id=?''',(card_id,card_id)).fetchone()[0]
+                if outstanding+cents>card[2]:
+                    raise ValueError('Ekstre alışverişi kartın kullanılabilir limitini aşıyor')
                 from v04_core import first_due
                 purchase_id=db.execute('INSERT INTO card_purchases(card_id,category,description,total_cents,installments,purchase_date) VALUES(?,?,?,?,1,?)',(card_id,category.strip(),description.strip(),cents,day)).lastrowid
-                due=first_due(date.fromisoformat(day),*card).isoformat()
+                due=first_due(date.fromisoformat(day),card[0],card[1]).isoformat()
                 db.execute('INSERT INTO card_installments(purchase_id,sequence,due_date,amount_cents) VALUES(?,1,?,?)',(purchase_id,due,cents))
         else:
             if not db.execute('SELECT 1 FROM accounts WHERE id=? AND profile_id=?',(account_id,profile)).fetchone():
