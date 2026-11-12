@@ -35,7 +35,7 @@ def add_item(db,profile,name,kind,category,amount_cents,frequency,first_due):
             not name.strip() or kind not in KINDS or frequency not in FREQUENCIES):
         raise ValueError('Geçersiz düzenli ödeme bilgisi')
     date.fromisoformat(first_due)
-    with db:
+    with write_transaction(db):
         return db.execute('INSERT INTO recurring_items(profile_id,name,kind,category,amount_cents,frequency,first_due) VALUES (?,?,?,?,?,?,?)',
             (profile,name.strip(),kind,category.strip() or 'Diğer',amount_cents,frequency,first_due)).lastrowid
 
