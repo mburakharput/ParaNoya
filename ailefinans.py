@@ -1627,6 +1627,8 @@ class App(QMainWindow):
     def select_page(self, index):
         self.stack.setCurrentIndex(index)
         self.heading.setText(self.page_titles[index])
+        # The modern content pages already have their own heading; don't show it twice.
+        self.heading.setVisible(index==0)
         self._mark_active_nav()
         self.refresh()
 
