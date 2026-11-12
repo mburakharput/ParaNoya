@@ -44,6 +44,13 @@ class TestRecurring(unittest.TestCase):
    with self.subTest(months=months):
     with self.assertRaises(ValueError):upcoming_items(self.db,1,date(2026,11,12),months)
 
+ def test_create_does_not_commit_outer_transaction(self):
+  self.db.execute('BEGIN IMMEDIATE')
+  item=add_item(self.db,1,'Geçici','bill','Faturalar',2500,'monthly','2026-11-15')
+  self.assertIsNotNone(self.db.execute('SELECT id FROM recurring_items WHERE id=?',(item,)).fetchone())
+  self.db.rollback()
+  self.assertIsNone(self.db.execute('SELECT id FROM recurring_items WHERE id=?',(item,)).fetchone())
+
  def test_archive_does_not_commit_outer_transaction(self):
   item=add_item(self.db,1,'Geçici','bill','Faturalar',2500,'monthly','2026-11-15')
   self.db.execute('BEGIN IMMEDIATE')
