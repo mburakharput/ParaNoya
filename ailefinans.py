@@ -1126,6 +1126,8 @@ class App(QMainWindow):
         recurring_layout.setSpacing(14)
         # Keep form rows at their natural height; the outer viewport scrolls instead of squeezing them.
         recurring_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetMinimumSize)
+        # A real minimum content height forces scrolling at 920x600 instead of compressed rows.
+        recurring_page.setMinimumHeight(930)
         recurring_title=QLabel('Faturalar ve Abonelikler')
         recurring_title.setObjectName('sectionTitle')
         recurring_layout.addWidget(recurring_title)
@@ -1160,15 +1162,16 @@ class App(QMainWindow):
         for label,widget in [('Ad',self.rec_name),('Tür',self.rec_kind),
                              ('Kategori',self.rec_category),('Tutar',self.rec_amount),
                              ('Yenileme sıklığı',self.rec_freq),('İlk vade',self.rec_due)]:
-            widget.setMinimumHeight(36)
+            widget.setMinimumHeight(42)
+            widget.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Fixed)
             entry_form.addRow(label,widget)
         save_rec=QPushButton('＋  Düzenli Ödeme Ekle')
         save_rec.setObjectName('accountPrimaryAction')
         save_rec.setMinimumHeight(43)
         save_rec.clicked.connect(self.save_recurring)
         entry_form.addRow(save_rec)
-        entry.setMinimumHeight(350)
-        entry.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Minimum)
+        entry.setMinimumHeight(425)
+        entry.setSizePolicy(QSizePolicy.Policy.Preferred,QSizePolicy.Policy.Fixed)
         recurring_layout.addWidget(entry)
 
         recurring_list_title=QLabel('Gecikmiş ve Yaklaşan Ödemeler')
@@ -1202,6 +1205,7 @@ class App(QMainWindow):
         recurring_scroll.setWidgetResizable(True)
         recurring_scroll.setFrameShape(QFrame.Shape.NoFrame)
         recurring_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        recurring_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         recurring_scroll.setWidget(recurring_page)
         self.stack.addWidget(recurring_scroll)
         products_page=QWidget()
