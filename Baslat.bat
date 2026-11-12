@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title ParaNoya - Gelistirme Onizlemesi
 
 rem Development runs with an isolated database; never open or migrate personal data.
-if not defined PARANOYA_DATA_DIR set "PARANOYA_DATA_DIR=%LOCALAPPDATA%\ParaNoya\DevelopmentSandbox"
+set "PARANOYA_DATA_DIR=%LOCALAPPDATA%\ParaNoya\DevelopmentSandbox"
 echo ParaNoya gelistirme onizlemesi
 echo Test veri klasoru: %PARANOYA_DATA_DIR%
 echo Kisisel finans verileri kullanilmaz.
