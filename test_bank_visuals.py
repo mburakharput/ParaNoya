@@ -103,6 +103,17 @@ class BankVisualTests(unittest.TestCase):
         self.assertEqual(owl.pixelColor(0,0).alpha(),0)
         self.assertGreater(owl.pixelColor(owl.width()//2,owl.height()//2).alpha(),200)
 
+    def test_recurring_form_keeps_scrollable_minimum_height(self):
+        """At minimum window size the form must scroll, never compress input controls."""
+        import inspect
+        source=inspect.getsource(App.__init__)
+        self.assertIn('recurring_page.setMinimumHeight(930)',source)
+        self.assertIn('entry.setMinimumHeight(425)',source)
+        self.assertIn('widget.setMinimumHeight(42)',source)
+        self.assertIn('QSizePolicy.Policy.Fixed',source)
+        self.assertIn('recurring_scroll.setWidget(recurring_page)',source)
+        self.assertIn('self.stack.addWidget(recurring_scroll)',source)
+
     def test_missing_logo_detail_uses_fixed_size_fallback(self):
         from PySide6.QtWidgets import QLabel
         host=SimpleNamespace(_bank_icon=lambda name: App._bank_icon(None,name),devicePixelRatioF=lambda:2)
